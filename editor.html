@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Baalsaal Map Editor</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0a0a0a;
+      color: #ccc;
+      font-family: 'Courier New', monospace;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      user-select: none;
+    }
+
+    /* ── TOOLBAR ── */
+    #toolbar {
+      background: #181818;
+      border-bottom: 1px solid #2a2a2a;
+      padding: 7px 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+      height: 40px;
+    }
+    #toolbar h1 {
+      font-size: 10px;
+      letter-spacing: 5px;
+      color: #444;
+      margin-right: 12px;
+      white-space: nowrap;
+    }
+    .btn {
+      background: #222;
+      border: 1px solid #3a3a3a;
+      color: #999;
+      padding: 4px 12px;
+      font-family: 'Courier New', monospace;
+      font-size: 10px;
+      cursor: pointer;
+      letter-spacing: 1px;
+      white-space: nowrap;
+    }
+    .btn:hover { background: #2e2e2e; color: #ddd; border-color: #666; }
+    .btn.danger { border-color: #522; color: #a66; }
+    .btn.danger:hover { background: #2a1010; color: #f88; border-color: #844; }
+    .sep { width: 1px; height: 20px; background: #2a2a2a; margin: 0 4px; }
+    #toolbar .hint { font-size: 9px; color: #333; letter-spacing: 1px; margin-left: auto; }
+
+    /* ── WORKSPACE ── */
+    #workspace {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ── SIDEBAR ── */
+    #sidebar {
+      width: 154px;
+      min-width: 154px;
+      background: #131313;
+      border-right: 1px solid #222;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 8px 6px;
+    }
+    #sidebar::-webkit-scrollbar { width: 4px; }
+    #sidebar::-webkit-scrollbar-track { background: #111; }
+    #sidebar::-webkit-scrollbar-thumb { background: #333; }
+
+    .sb-section-title {
+      font-size: 8px;
+      letter-spacing: 3px;
+      color: #3a3a3a;
+      text-transform: uppercase;
+      padding: 6px 4px 4px;
+      border-bottom: 1px solid #1e1e1e;
+      margin-bottom: 5px;
+    }
+    .sb-section-title:not(:first-child) { margin-top: 10px; }
+
+    .pal-room, .pal-item {
+      padding: 5px 7px;
+      margin-bottom: 3px;
+      border: 1px solid #222;
+      cursor: grab;
+      font-size: 10px;
+      letter-spacing: 0.5px;
+      border-radius: 2px;
+      transition: border-color 0.1s;
+    }
+    .pal-room:hover { border-color: #555; }
+    .pal-item:hover { border-color: #555; background: #1a1a1a; }
+    .pal-room:active, .pal-item:active { cursor: grabbing; }
+    .pal-room .pl { color: #bbb; font-size: 10px; }
+    .pal-item .pl { color: #bbb; font-size: 10px; }
+
+    /* ── CANVAS WRAPPER ── */
+    #canvas-wrap {
+      flex: 1;
+      overflow: auto;
+      display: flex;
+      align-items: flex-start;
+      justify-content: flex-start;
+      padding: 16px;
+      background: #0c0c0c;
+    }
+    #canvas-wrap::-webkit-scrollbar { width: 8px; height: 8px; }
+    #canvas-wrap::-webkit-scrollbar-track { background: #111; }
+    #canvas-wrap::-webkit-scrollbar-thumb { background: #2a2a2a; }
+
+    /* ── CANVAS ── */
+    #canvas {
+      width: 800px;
+      height: 660px;
+      position: relative;
+      flex-shrink: 0;
+      overflow: hidden;
+      background-color: #111;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+      background-size: 20px 20px;
+      outline: 1px solid #222;
+    }
+    #canvas.drop-active { outline-color: #555; }
+
+    /* ── PLACED ROOMS ── */
+    .placed-room {
+      position: absolute;
+      border: 2px solid rgba(255,255,255,0.55);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: move;
+      z-index: 2;
+      transition: border-color 0.1s;
+    }
+    .placed-room.selected {
+      border-color: #ffff00 !important;
+      z-index: 100 !important;
+    }
+    .room-label {
+      font-size: 11px;
+      font-weight: bold;
+      letter-spacing: 1px;
+      text-align: center;
+      pointer-events: none;
+      color: rgba(255,255,255,0.8);
+      line-height: 1.4;
+      padding: 2px 4px;
+      word-break: break-word;
+      max-width: 100%;
+    }
+
+    /* ── RESIZE HANDLES ── */
+    .rh {
+      position: absolute;
+      width: 9px;
+      height: 9px;
+      background: #e0e0e0;
+      border: 1px solid #666;
+      z-index: 20;
+      display: none;
+    }
+    .placed-room.selected .rh { display: block; }
+    .rh.nw { top:-5px;  left:-5px;  cursor: nw-resize; }
+    .rh.ne { top:-5px;  right:-5px; cursor: ne-resize; }
+    .rh.sw { bottom:-5px; left:-5px;  cursor: sw-resize; }
+    .rh.se { bottom:-5px; right:-5px; cursor: se-resize; }
+    /* Edge handles */
+    .rh.n  { top:-5px;  left:50%;  transform:translateX(-50%); cursor: n-resize; }
+    .rh.s  { bottom:-5px; left:50%; transform:translateX(-50%); cursor: s-resize; }
+    .rh.w  { left:-5px; top:50%;   transform:translateY(-50%); cursor: w-resize; }
+    .rh.e  { right:-5px; top:50%;  transform:translateY(-50%); cursor: e-resize; }
+
+    /* ── PLACED ITEMS ── */
+    .placed-item {
+      position: absolute;
+      cursor: move;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      z-index: 10;
+    }
+    .placed-item.selected .item-box { outline: 2px solid #ffff00; }
+    .item-box {
+      width: 38px;
+      height: 38px;
+      background: #1e1e1e;
+      border: 1px solid #3a3a3a;
+      border-radius: 3px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      pointer-events: none;
+    }
+    .item-lbl {
+      font-size: 8px;
+      color: #666;
+      margin-top: 2px;
+      text-align: center;
+      letter-spacing: 0.5px;
+      max-width: 60px;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+
+    /* ── DRAG GHOST ── */
+    #ghost {
+      position: fixed;
+      pointer-events: none;
+      z-index: 9999;
+      opacity: 0.65;
+      border: 2px dashed #888;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Courier New', monospace;
+      font-size: 10px;
+      color: #ccc;
+      background: #1a1a1a;
+    }
+
+    /* ── STATUS ── */
+    #status {
+      background: #131313;
+      border-top: 1px solid #1e1e1e;
+      padding: 4px 14px;
+      font-size: 9px;
+      color: #3a3a3a;
+      letter-spacing: 1px;
+      flex-shrink: 0;
+      height: 24px;
+      white-space: nowrap;
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body>
+
+<div id="toolbar">
+  <h1>BAALSAAL MAP EDITOR</h1>
+  <div class="sep"></div>
+  <button class="btn" onclick="doExportJSON()">⬇ JSON</button>
+  <button class="btn" onclick="doSaveImage()">⬇ PNG</button>
+  <div class="sep"></div>
+  <button class="btn danger" onclick="doClearAll()">✕ Alles löschen</button>
+  <span class="hint">Drag aus Sidebar → Canvas &nbsp;|&nbsp; Ecken ziehen = skalieren &nbsp;|&nbsp; Entf = löschen</span>
+</div>
+
+<div id="workspace">
+  <div id="sidebar">
+    <div class="sb-section-title">Räume</div>
+    <div id="room-pal"></div>
+    <div class="sb-section-title">Items</div>
+    <div id="item-pal"></div>
+  </div>
+  <div id="canvas-wrap">
+    <div id="canvas"></div>
+  </div>
+</div>
+
+<div id="status">Ziehe Räume und Items aus der Sidebar auf den Canvas.</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════
+   CONSTANTS & DEFINITIONS
+═══════════════════════════════════════════════════════ */
+const GRID = 20;
+const CW = 800, CH = 660;
+const MIN_W = 40, MIN_H = 30;
+
+const ROOMS = [
+  { type:'dancefloor',    label:'DANCEFLOOR',        color:'#091809', border:'#507a50', dw:360, dh:200 },
+  { type:'flur1',         label:'FLUR 1',             color:'#141414', border:'#555',   dw:500, dh:50  },
+  { type:'flur2',         label:'FLUR 2',             color:'#141414', border:'#555',   dw:55,  dh:160 },
+  { type:'eingang',       label:'EINGANGS-\nBEREICH', color:'#0c1520', border:'#3d6080',dw:140, dh:120 },
+  { type:'garderobe',     label:'GARDEROBE',          color:'#0c0c1e', border:'#3d3d7a',dw:120, dh:100 },
+  { type:'vorraum',       label:'TOILETTEN\nVORRAUM', color:'#161616', border:'#555',   dw:140, dh:100 },
+  { type:'maennerwc',     label:'MÄNNER\nWC',         color:'#0a0a18', border:'#3a4a88',dw:160, dh:280 },
+  { type:'frauenwc',      label:'FRAUEN\nWC',         color:'#180a16', border:'#883a60',dw:120, dh:280 },
+  { type:'chillraum',     label:'CHILL-\nRAUM',       color:'#110b1a', border:'#664499',dw:220, dh:200 },
+  { type:'treppehoch',    label:'TREPPE\nHOCH',       color:'#1c1408', border:'#996622',dw:120, dh:60  },
+  { type:'treppenrunter', label:'TREPPEN\n↓ Eingang', color:'#181808', border:'#999933',dw:140, dh:560 },
+];
+
+const ITEMS = [
+  { type:'djbooth',    label:'DJ Booth',       icon:'🎧', color:'#0a200a' },
+  { type:'bar',        label:'Bar',            icon:'🍺', color:'#201208' },
+  { type:'sessel',     label:'Sessel',         icon:'🪑', color:'#141424' },
+  { type:'fotobox',    label:'Fotobox',        icon:'📷', color:'#141414' },
+  { type:'bank',       label:'Bank',           icon:'🪵', color:'#1a1208' },
+  { type:'holzbank',   label:'Holzbank/Kette', icon:'⛓️', color:'#181008' },
+  { type:'bendix',     label:'Bendix',         icon:'🧍', color:'#082008', iconColor:'#00ff66' },
+  { type:'tuersteher', label:'Türsteher',      icon:'🧍', color:'#141414', iconColor:'#ffffff' },
+  { type:'startpunkt', label:'Startpunkt',     icon:'▶',  color:'#080820' },
+];
+
+/* ═══════════════════════════════════════════════════════
+   STATE
+═══════════════════════════════════════════════════════ */
+let state = { rooms: [], items: [] };
+let nid = 1;
+let sel = null;     // selected DOM element
+let dragState = null;
+/*
+  { mode:'place', def, isRoom, ghost }
+  { mode:'move',  el, data, ox, oy, ex, ey }
+  { mode:'resize',el, room, handle, sx, sy, ox, oy, ow, oh }
+*/
+
+/* ═══════════════════════════════════════════════════════
+   UTILITIES
+═══════════════════════════════════════════════════════ */
+const snap = v => Math.round(v / GRID) * GRID;
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const $ = id => document.getElementById(id);
+const canvas = () => $('canvas');
+
+function setStatus(msg) { $('status').textContent = msg; }
+
+/* ═══════════════════════════════════════════════════════
+   BUILD SIDEBAR PALETTE
+═══════════════════════════════════════════════════════ */
+function buildPalette() {
+  const rp = $('room-pal');
+  ROOMS.forEach(def => {
+    const d = document.createElement('div');
+    d.className = 'pal-room';
+    d.style.cssText = `background:${def.color};border-left:3px solid ${def.border};`;
+    d.innerHTML = `<span class="pl">${def.label.replace('\n',' ')}</span>`;
+    d.addEventListener('mousedown', e => { e.preventDefault(); startPalDrag(e, def, true); });
+    rp.appendChild(d);
+  });
+
+  const ip = $('item-pal');
+  ITEMS.forEach(def => {
+    const d = document.createElement('div');
+    d.className = 'pal-item';
+    d.innerHTML = `<span class="pl">${def.icon} ${def.label}</span>`;
+    d.addEventListener('mousedown', e => { e.preventDefault(); startPalDrag(e, def, false); });
+    ip.appendChild(d);
+  });
+}
+
+/* ═══════════════════════════════════════════════════════
+   PALETTE DRAG → CANVAS DROP
+═══════════════════════════════════════════════════════ */
+function startPalDrag(e, def, isRoom) {
+  const ghost = document.createElement('div');
+  ghost.id = 'ghost';
+  if (isRoom) {
+    const gw = Math.min(def.dw * 0.5, 120);
+    const gh = Math.min(def.dh * 0.4, 50);
+    ghost.style.cssText = `width:${gw}px;height:${gh}px;background:${def.color};border-color:${def.border};`;
+    ghost.textContent = def.label.replace('\n',' ');
+  } else {
+    ghost.style.cssText = `width:44px;height:44px;font-size:22px;border-color:#555;`;
+    ghost.textContent = def.icon;
+  }
+  posGhost(ghost, e.clientX, e.clientY);
+  document.body.appendChild(ghost);
+
+  dragState = { mode:'place', def, isRoom, ghost };
+  canvas().classList.add('drop-active');
+  setStatus(`"${def.label.replace('\n',' ')}" — auf Canvas loslassen zum Platzieren...`);
+}
+
+function posGhost(g, cx, cy) {
+  g.style.left = (cx - 25) + 'px';
+  g.style.top  = (cy - 20) + 'px';
+}
+
+/* ═══════════════════════════════════════════════════════
+   PLACE ELEMENT ON CANVAS
+═══════════════════════════════════════════════════════ */
+function placeRoom(def, cx, cy) {
+  const id = nid++;
+  const r = {
+    id, type: def.type, label: def.label,
+    color: def.color, border: def.border,
+    x: clamp(snap(cx - def.dw/2), 0, CW - def.dw),
+    y: clamp(snap(cy - def.dh/2), 0, CH - def.dh),
+    w: def.dw, h: def.dh,
+  };
+  state.rooms.push(r);
+  const el = makeRoomEl(r);
+  canvas().appendChild(el);
+  doSelect(el);
+  setStatus(`Raum "${def.label.replace('\n',' ')}" platziert.`);
+}
+
+function placeItem(def, cx, cy) {
+  const id = nid++;
+  const it = {
+    id, type: def.type, label: def.label,
+    icon: def.icon, color: def.color,
+    x: clamp(snap(cx - 20), 0, CW - 40),
+    y: clamp(snap(cy - 20), 0, CH - 60),
+  };
+  state.items.push(it);
+  const el = makeItemEl(it);
+  canvas().appendChild(el);
+  doSelect(el);
+  setStatus(`Item "${def.label}" platziert.`);
+}
+
+/* ═══════════════════════════════════════════════════════
+   CREATE DOM ELEMENTS
+═══════════════════════════════════════════════════════ */
+function makeRoomEl(r) {
+  const el = document.createElement('div');
+  el.className = 'placed-room';
+  el.dataset.id = r.id;
+  el.dataset.kind = 'room';
+  applyRoom(el, r);
+
+  // Label (multiline)
+  const lbl = document.createElement('div');
+  lbl.className = 'room-label';
+  r.label.split('\n').forEach((line, i) => {
+    if (i) lbl.appendChild(document.createElement('br'));
+    lbl.appendChild(document.createTextNode(line));
+  });
+  el.appendChild(lbl);
+
+  // Resize handles
+  ['nw','ne','sw','se','n','s','w','e'].forEach(dir => {
+    const h = document.createElement('div');
+    h.className = 'rh ' + dir;
+    h.addEventListener('mousedown', ev => { ev.stopPropagation(); ev.preventDefault(); startResize(ev, el, r, dir); });
+    el.appendChild(h);
+  });
+
+  el.addEventListener('mousedown', ev => {
+    if (ev.target.classList.contains('rh')) return;
+    ev.preventDefault();
+    doSelect(el);
+    startMove(ev, el, r);
+  });
+
+  return el;
+}
+
+function applyRoom(el, r) {
+  el.style.cssText = `left:${r.x}px;top:${r.y}px;width:${r.w}px;height:${r.h}px;background:${r.color};border-color:${r.border};`;
+}
+
+function makeItemEl(it) {
+  const el = document.createElement('div');
+  el.className = 'placed-item';
+  el.dataset.id = it.id;
+  el.dataset.kind = 'item';
+  el.style.cssText = `left:${it.x}px;top:${it.y}px;`;
+
+  const box = document.createElement('div');
+  box.className = 'item-box';
+  box.style.background = it.color;
+  box.textContent = it.icon;
+  el.appendChild(box);
+
+  const lbl = document.createElement('div');
+  lbl.className = 'item-lbl';
+  lbl.textContent = it.label;
+  el.appendChild(lbl);
+
+  el.addEventListener('mousedown', ev => {
+    ev.preventDefault();
+    doSelect(el);
+    startMove(ev, el, it);
+  });
+  return el;
+}
+
+/* ═══════════════════════════════════════════════════════
+   SELECTION
+═══════════════════════════════════════════════════════ */
+function doSelect(el) {
+  if (sel) { sel.classList.remove('selected'); }
+  sel = el;
+  if (el) {
+    el.classList.add('selected');
+    const id = +el.dataset.id;
+    const kind = el.dataset.kind;
+    const d = kind === 'room'
+      ? state.rooms.find(r => r.id === id)
+      : state.items.find(i => i.id === id);
+    setStatus(`► ${d?.label?.replace('\n',' ') || '?'}   |   Ecken ziehen = skalieren   |   Entf = löschen`);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════
+   MOVE
+═══════════════════════════════════════════════════════ */
+function startMove(e, el, data) {
+  dragState = { mode:'move', el, data, sx: e.clientX, sy: e.clientY, ox: data.x, oy: data.y };
+}
+
+/* ═══════════════════════════════════════════════════════
+   RESIZE
+═══════════════════════════════════════════════════════ */
+function startResize(e, el, room, handle) {
+  dragState = { mode:'resize', el, room, handle, sx: e.clientX, sy: e.clientY,
+                ox: room.x, oy: room.y, ow: room.w, oh: room.h };
+}
+
+/* ═══════════════════════════════════════════════════════
+   GLOBAL MOUSE HANDLERS
+═══════════════════════════════════════════════════════ */
+document.addEventListener('mousemove', e => {
+  if (!dragState) return;
+  const ds = dragState;
+
+  if (ds.mode === 'place') {
+    posGhost(ds.ghost, e.clientX, e.clientY);
+    return;
+  }
+
+  if (ds.mode === 'move') {
+    const dx = e.clientX - ds.sx;
+    const dy = e.clientY - ds.sy;
+    const d = ds.data;
+    const isRoom = ds.el.dataset.kind === 'room';
+    const w = isRoom ? d.w : 40;
+    const h = isRoom ? d.h : 60;
+    d.x = clamp(snap(ds.ox + dx), 0, CW - w);
+    d.y = clamp(snap(ds.oy + dy), 0, CH - h);
+    ds.el.style.left = d.x + 'px';
+    ds.el.style.top  = d.y + 'px';
+    return;
+  }
+
+  if (ds.mode === 'resize') {
+    const dx = e.clientX - ds.sx;
+    const dy = e.clientY - ds.sy;
+    const h = ds.handle;
+    const room = ds.room;
+    const right  = ds.ox + ds.ow;
+    const bottom = ds.oy + ds.oh;
+
+    let nx = ds.ox, ny = ds.oy, nr = right, nb = bottom;
+
+    if (h.includes('e')) nr = Math.max(ds.ox + MIN_W, snap(right  + dx));
+    if (h.includes('s')) nb = Math.max(ds.oy + MIN_H, snap(bottom + dy));
+    if (h.includes('w')) nx = Math.min(right  - MIN_W, snap(ds.ox + dx));
+    if (h.includes('n')) ny = Math.min(bottom - MIN_H, snap(ds.oy + dy));
+
+    room.x = nx; room.y = ny;
+    room.w = nr - nx; room.h = nb - ny;
+    applyRoom(ds.el, room);
+  }
+});
+
+document.addEventListener('mouseup', e => {
+  if (!dragState) return;
+  const ds = dragState;
+  dragState = null;
+
+  if (ds.mode === 'place') {
+    ds.ghost.remove();
+    canvas().classList.remove('drop-active');
+    const rect = canvas().getBoundingClientRect();
+    const inside = e.clientX >= rect.left && e.clientX <= rect.right &&
+                   e.clientY >= rect.top  && e.clientY <= rect.bottom;
+    if (inside) {
+      const cx = e.clientX - rect.left;
+      const cy = e.clientY - rect.top;
+      if (ds.isRoom) placeRoom(ds.def, cx, cy);
+      else placeItem(ds.def, cx, cy);
+    } else {
+      setStatus('Außerhalb des Canvas losgelassen — kein Objekt platziert.');
+    }
+  }
+});
+
+/* Click on empty canvas = deselect */
+canvas().addEventListener('mousedown', e => {
+  if (e.target !== canvas()) return;
+  if (sel) { sel.classList.remove('selected'); sel = null; }
+  setStatus('Ziehe Räume und Items aus der Sidebar auf den Canvas.');
+});
+
+/* Delete key */
+document.addEventListener('keydown', e => {
+  if (!sel) return;
+  if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+  if (document.activeElement && document.activeElement.tagName === 'INPUT') return;
+
+  const id = +sel.dataset.id;
+  const kind = sel.dataset.kind;
+  if (kind === 'room') state.rooms = state.rooms.filter(r => r.id !== id);
+  else state.items = state.items.filter(i => i.id !== id);
+  sel.remove();
+  sel = null;
+  setStatus('Element gelöscht.');
+});
+
+/* ═══════════════════════════════════════════════════════
+   TOOLBAR ACTIONS
+═══════════════════════════════════════════════════════ */
+function doClearAll() {
+  if (!confirm('Wirklich alles löschen?')) return;
+  state = { rooms: [], items: [] };
+  canvas().querySelectorAll('.placed-room, .placed-item').forEach(el => el.remove());
+  sel = null;
+  setStatus('Canvas geleert.');
+}
+
+function doExportJSON() {
+  const out = {
+    rooms: state.rooms.map(r => ({ id:r.id, type:r.type, label:r.label, x:r.x, y:r.y, w:r.w, h:r.h })),
+    items: state.items.map(i => ({ id:i.id, type:i.type, label:i.label, x:i.x, y:i.y })),
+  };
+  const blob = new Blob([JSON.stringify(out, null, 2)], { type:'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'baalsaal-map.json';
+  a.click();
+  setStatus(`JSON exportiert — ${out.rooms.length} Räume, ${out.items.length} Items.`);
+}
+
+function doSaveImage() {
+  const c = document.createElement('canvas');
+  c.width = CW; c.height = CH;
+  const ctx = c.getContext('2d');
+
+  // Background
+  ctx.fillStyle = '#111';
+  ctx.fillRect(0, 0, CW, CH);
+
+  // Grid
+  ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+  ctx.lineWidth = 1;
+  for (let x = 0; x <= CW; x += GRID) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,CH); ctx.stroke(); }
+  for (let y = 0; y <= CH; y += GRID) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(CW,y); ctx.stroke(); }
+
+  // Rooms
+  state.rooms.forEach(r => {
+    ctx.fillStyle = r.color;
+    ctx.fillRect(r.x, r.y, r.w, r.h);
+    ctx.strokeStyle = r.border;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(r.x+1, r.y+1, r.w-2, r.h-2);
+    // Label
+    ctx.fillStyle = 'rgba(255,255,255,0.82)';
+    ctx.font = 'bold 11px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const lines = r.label.split('\n');
+    const lh = 15;
+    const startY = r.y + r.h/2 - (lines.length - 1) * lh/2;
+    lines.forEach((ln, i) => ctx.fillText(ln, r.x + r.w/2, startY + i*lh));
+  });
+
+  // Items
+  state.items.forEach(it => {
+    ctx.fillStyle = it.color || '#1e1e1e';
+    ctx.fillRect(it.x, it.y, 38, 38);
+    ctx.strokeStyle = '#3a3a3a';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(it.x, it.y, 38, 38);
+    ctx.font = '20px serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(it.icon, it.x + 19, it.y + 19);
+    ctx.fillStyle = '#666';
+    ctx.font = '8px monospace';
+    ctx.fillText(it.label, it.x + 19, it.y + 50);
+  });
+
+  const a = document.createElement('a');
+  a.href = c.toDataURL('image/png');
+  a.download = 'baalsaal-map.png';
+  a.click();
+  setStatus('PNG gespeichert.');
+}
+
+/* ═══════════════════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════════════════ */
+buildPalette();
+</script>
+</body>
+</html>
