@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Baalsaal — Grundriss</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0a0a0a;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 24px 20px;
+      font-family: 'Courier New', monospace;
+      color: #888;
+    }
+    h1 {
+      font-size: 12px;
+      letter-spacing: 8px;
+      text-transform: uppercase;
+      color: #444;
+      margin-bottom: 20px;
+    }
+    .room-group {
+      cursor: pointer;
+    }
+    .room-group rect.bg {
+      transition: fill 0.12s;
+    }
+    .room-group:hover rect.bg {
+      fill-opacity: 0.6;
+    }
+    #info {
+      margin-top: 16px;
+      font-size: 11px;
+      color: #555;
+      letter-spacing: 3px;
+      min-height: 20px;
+    }
+    #legend {
+      margin-top: 24px;
+      font-size: 10px;
+      color: #333;
+      letter-spacing: 1px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Baalsaal Hamburg — Grundriss v0.1</h1>
+
+  <svg id="floor" viewBox="0 0 800 660" width="800" height="660" style="display:block;">
+    <defs>
+      <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+        <path d="M20 0L0 0 0 20" fill="none" stroke="#1c1c1c" stroke-width="0.5"/>
+      </pattern>
+    </defs>
+
+    <!-- Background -->
+    <rect width="800" height="660" fill="#111"/>
+    <rect width="800" height="660" fill="url(#grid)"/>
+
+    <!-- ═══════════════════════════════════════════
+         OBERE ETAGE: DANCEFLOOR / EINGANG / GARDEROBE
+         ═══════════════════════════════════════════ -->
+
+    <!-- DANCEFLOOR: x=20-390, y=10-240 -->
+    <g class="room-group" data-name="DANCEFLOOR" onclick="selectRoom(this)">
+      <rect class="bg" x="20" y="10" width="370" height="230" fill="#0b1b0b" stroke="#fff" stroke-width="2"/>
+      <text x="112" y="146" fill="#cceecc" font-size="14" font-weight="bold"
+            letter-spacing="2" font-family="monospace">DANCEFLOOR</text>
+    </g>
+
+    <!-- GARDEROBE: x=390-520, y=10-90 -->
+    <g class="room-group" data-name="GARDEROBE" onclick="selectRoom(this)">
+      <rect class="bg" x="390" y="10" width="130" height="80" fill="#0e0e20" stroke="#fff" stroke-width="2"/>
+      <text x="408" y="55" fill="#aaaadd" font-size="11" font-family="monospace">GARDEROBE</text>
+    </g>
+
+    <!-- EINGANGSBEREICH: x=390-590, y=90-240 -->
+    <g class="room-group" data-name="EINGANGSBEREICH" onclick="selectRoom(this)">
+      <rect class="bg" x="390" y="90" width="200" height="150" fill="#0d1620" stroke="#fff" stroke-width="2"/>
+      <text x="415" y="160" fill="#aabbcc" font-size="12" font-family="monospace">EINGANGS-</text>
+      <text x="415" y="178" fill="#aabbcc" font-size="12" font-family="monospace">BEREICH</text>
+    </g>
+
+    <!-- TREPPEN: x=590-740, y=90-570 (runter = Eingang von der Straße) -->
+    <g class="room-group" data-name="TREPPEN (↓ Straße)" onclick="selectRoom(this)">
+      <rect class="bg" x="590" y="90" width="150" height="480" fill="#1a1a0d" stroke="#fff" stroke-width="2"/>
+      <text x="617" y="342" fill="#cccc88" font-size="12" font-family="monospace">TREPPEN</text>
+      <text x="613" y="360" fill="#777744" font-size="9" font-family="monospace">↓ Straße</text>
+    </g>
+
+    <!-- ═══════════════════════════════════════════
+         FLUR 1: horizontaler Verbindungsflur
+         ═══════════════════════════════════════════ -->
+
+    <!-- FLUR 1: x=20-590, y=240-295 -->
+    <g class="room-group" data-name="FLUR 1" onclick="selectRoom(this)">
+      <rect class="bg" x="20" y="240" width="570" height="55" fill="#141414" stroke="#fff" stroke-width="2"/>
+      <text x="250" y="273" fill="#555" font-size="11" font-family="monospace">FLUR 1</text>
+    </g>
+
+    <!-- ═══════════════════════════════════════════
+         UNTERE ETAGE: CHILLRAUM / WCs / FLUR 2
+         ═══════════════════════════════════════════ -->
+
+    <!-- FLUR 2: x=20-75, y=295-570 (vertikal, ganz links) -->
+    <g class="room-group" data-name="FLUR 2" onclick="selectRoom(this)">
+      <rect class="bg" x="20" y="295" width="55" height="275" fill="#141414" stroke="#fff" stroke-width="2"/>
+      <text x="47" y="432" fill="#555" font-size="11" font-family="monospace"
+            text-anchor="middle" transform="rotate(-90 47 432)">FLUR 2</text>
+    </g>
+
+    <!-- CHILLRAUM: x=75-285, y=295-570 -->
+    <g class="room-group" data-name="CHILLRAUM" onclick="selectRoom(this)">
+      <rect class="bg" x="75" y="295" width="210" height="275" fill="#170e20" stroke="#fff" stroke-width="2"/>
+      <text x="148" y="422" fill="#ddccee" font-size="14" font-weight="bold" font-family="monospace">CHILL-</text>
+      <text x="148" y="442" fill="#ddccee" font-size="14" font-weight="bold" font-family="monospace">RAUM</text>
+    </g>
+
+    <!-- TOILETTEN VORRAUM: x=285-450, y=295-395 -->
+    <g class="room-group" data-name="TOILETTEN VORRAUM" onclick="selectRoom(this)">
+      <rect class="bg" x="285" y="295" width="165" height="100" fill="#161616" stroke="#fff" stroke-width="2"/>
+      <text x="303" y="336" fill="#888" font-size="10" font-family="monospace">TOILETTEN</text>
+      <text x="309" y="351" fill="#888" font-size="10" font-family="monospace">VORRAUM</text>
+    </g>
+
+    <!-- MÄNNER WC: x=285-450, y=395-570 -->
+    <g class="room-group" data-name="MÄNNER WC" onclick="selectRoom(this)">
+      <rect class="bg" x="285" y="395" width="165" height="175" fill="#0c0c1a" stroke="#fff" stroke-width="2"/>
+      <text x="325" y="475" fill="#7788ff" font-size="12" font-family="monospace">MÄNNER</text>
+      <text x="338" y="493" fill="#7788ff" font-size="12" font-family="monospace">WC</text>
+    </g>
+
+    <!-- FRAUEN WC: x=450-590, y=295-570 -->
+    <g class="room-group" data-name="FRAUEN WC" onclick="selectRoom(this)">
+      <rect class="bg" x="450" y="295" width="140" height="275" fill="#1a0e18" stroke="#fff" stroke-width="2"/>
+      <text x="473" y="432" fill="#ff88bb" font-size="12" font-family="monospace">FRAUEN</text>
+      <text x="481" y="450" fill="#ff88bb" font-size="12" font-family="monospace">WC</text>
+    </g>
+
+    <!-- ═══════════════════════════════════════════
+         GANZ UNTEN: TREPPE HOCH (zur Bendix-Plattform)
+         ═══════════════════════════════════════════ -->
+
+    <!-- TREPPE HOCH: x=20-135, y=570-630 -->
+    <g class="room-group" data-name="TREPPE HOCH" onclick="selectRoom(this)">
+      <rect class="bg" x="20" y="570" width="115" height="58" fill="#1e1508" stroke="#fff" stroke-width="2"/>
+      <text x="30" y="597" fill="#ffcc55" font-size="10" font-family="monospace">TREPPE</text>
+      <text x="36" y="613" fill="#ffcc55" font-size="10" font-family="monospace">HOCH</text>
+    </g>
+
+    <!-- ═══════════════════════════════════════════
+         TÜRSTEHER (außen, rechts von TREPPEN)
+         ═══════════════════════════════════════════ -->
+    <text x="752" y="548" fill="#555" font-size="9" font-family="monospace">TUER-</text>
+    <text x="749" y="560" fill="#555" font-size="9" font-family="monospace">STEHER</text>
+    <!-- Strichmännchen -->
+    <circle cx="762" cy="508" r="7" fill="none" stroke="#444" stroke-width="1.5"/>
+    <line x1="762" y1="515" x2="762" y2="535" stroke="#444" stroke-width="1.5"/>
+    <line x1="750" y1="522" x2="774" y2="522" stroke="#444" stroke-width="1.5"/>
+    <line x1="762" y1="535" x2="752" y2="548" stroke="#444" stroke-width="1.5"/>
+    <line x1="762" y1="535" x2="772" y2="548" stroke="#444" stroke-width="1.5"/>
+
+  </svg>
+
+  <div id="info">Klicke auf einen Raum</div>
+  <div id="legend">v0.1 — nur Grundrechtecke — noch keine Türen / Details</div>
+
+  <script>
+    let current = null;
+
+    function selectRoom(g) {
+      const STROKE_DEFAULT = '#ffffff';
+      const STROKE_SELECTED = '#ffff00';
+      const W_DEFAULT = '2';
+      const W_SELECTED = '3';
+
+      if (current) {
+        const r = current.querySelector('rect.bg');
+        r.setAttribute('stroke', STROKE_DEFAULT);
+        r.setAttribute('stroke-width', W_DEFAULT);
+      }
+
+      if (current === g) {
+        current = null;
+        document.getElementById('info').textContent = 'Klicke auf einen Raum';
+        return;
+      }
+
+      const rect = g.querySelector('rect.bg');
+      rect.setAttribute('stroke', STROKE_SELECTED);
+      rect.setAttribute('stroke-width', W_SELECTED);
+      current = g;
+      document.getElementById('info').textContent = '► ' + g.dataset.name;
+    }
+  </script>
+</body>
+</html>
