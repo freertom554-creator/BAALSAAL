@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Baalsaal — Grundriss</title>
+  <title>Baalsaal — Grundriss v0.2</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -12,188 +12,226 @@
       flex-direction: column;
       align-items: center;
       min-height: 100vh;
-      padding: 24px 20px;
+      padding: 20px;
       font-family: 'Courier New', monospace;
-      color: #888;
     }
     h1 {
-      font-size: 12px;
-      letter-spacing: 8px;
-      text-transform: uppercase;
+      font-size: 11px;
+      letter-spacing: 6px;
       color: #444;
-      margin-bottom: 20px;
+      margin-bottom: 16px;
+      text-transform: uppercase;
     }
-    .room-group {
-      cursor: pointer;
-    }
-    .room-group rect.bg {
-      transition: fill 0.12s;
-    }
-    .room-group:hover rect.bg {
-      fill-opacity: 0.6;
-    }
+    .rg { cursor: pointer; }
+    .rg rect.bg { transition: filter 0.1s; }
+    .rg:hover rect.bg { filter: brightness(1.6); }
     #info {
-      margin-top: 16px;
+      margin-top: 12px;
       font-size: 11px;
       color: #555;
-      letter-spacing: 3px;
-      min-height: 20px;
-    }
-    #legend {
-      margin-top: 24px;
-      font-size: 10px;
-      color: #333;
-      letter-spacing: 1px;
+      letter-spacing: 2px;
+      min-height: 18px;
     }
   </style>
 </head>
 <body>
-  <h1>Baalsaal Hamburg — Grundriss v0.1</h1>
+  <h1>Baalsaal Hamburg — Grundriss v0.2</h1>
 
-  <svg id="floor" viewBox="0 0 800 660" width="800" height="660" style="display:block;">
+  <!--
+    Koordinaten-Übersicht (x, y, w, h):
+    DANCEFLOOR        20  10  450 220   → rechts 470, unten 230
+    GARDEROBE        470  10  130 100   → rechts 600, unten 110
+    EINGANGSBEREICH  470 110  130 120   → rechts 600, unten 230
+    TREPPEN          600  10  170 600   → rechts 770, unten 610
+    FLUR 1            20 230  580  55   → rechts 600, unten 285
+    FLUR 2            20 285   50 140   → rechts  70, unten 425
+    CHILLRAUM         20 425  180 185   → rechts 200, unten 610
+    TREPPE HOCH       20 610  130  60   → rechts 150, unten 670
+    MÄNNER WC        200 285  170 325   → rechts 370, unten 610
+    VORRAUM          370 285  130 100   → rechts 500, unten 385
+    FRAUEN WC        500 285  100 325   → rechts 600, unten 610
+  -->
+
+  <svg viewBox="0 0 800 700" width="800" height="700" style="display:block;">
     <defs>
       <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
-        <path d="M20 0L0 0 0 20" fill="none" stroke="#1c1c1c" stroke-width="0.5"/>
+        <path d="M20 0L0 0 0 20" fill="none" stroke="#1a1a1a" stroke-width="0.5"/>
       </pattern>
     </defs>
+    <rect width="800" height="700" fill="#111"/>
+    <rect width="800" height="700" fill="url(#grid)"/>
 
-    <!-- Background -->
-    <rect width="800" height="660" fill="#111"/>
-    <rect width="800" height="660" fill="url(#grid)"/>
+    <!-- ══════════════════════════════════
+         RÄUME
+         ══════════════════════════════════ -->
 
-    <!-- ═══════════════════════════════════════════
-         OBERE ETAGE: DANCEFLOOR / EINGANG / GARDEROBE
-         ═══════════════════════════════════════════ -->
-
-    <!-- DANCEFLOOR: x=20-390, y=10-240 -->
-    <g class="room-group" data-name="DANCEFLOOR" onclick="selectRoom(this)">
-      <rect class="bg" x="20" y="10" width="370" height="230" fill="#0b1b0b" stroke="#fff" stroke-width="2"/>
-      <text x="112" y="146" fill="#cceecc" font-size="14" font-weight="bold"
-            letter-spacing="2" font-family="monospace">DANCEFLOOR</text>
+    <!-- DANCEFLOOR: 60% Breite, größter Raum -->
+    <g class="rg" data-name="DANCEFLOOR" onclick="sel(this)">
+      <rect class="bg" x="20" y="10" width="450" height="220"
+            fill="#091809" stroke="#fff" stroke-width="2"/>
+      <text x="245" y="125" fill="#b8ddb8" font-size="16" font-weight="bold"
+            font-family="monospace" letter-spacing="3" text-anchor="middle">DANCEFLOOR</text>
     </g>
 
-    <!-- GARDEROBE: x=390-520, y=10-90 -->
-    <g class="room-group" data-name="GARDEROBE" onclick="selectRoom(this)">
-      <rect class="bg" x="390" y="10" width="130" height="80" fill="#0e0e20" stroke="#fff" stroke-width="2"/>
-      <text x="408" y="55" fill="#aaaadd" font-size="11" font-family="monospace">GARDEROBE</text>
+    <!-- GARDEROBE: kleiner Raum, oben rechts, links neben Eingangsbereich -->
+    <g class="rg" data-name="GARDEROBE" onclick="sel(this)">
+      <rect class="bg" x="470" y="10" width="130" height="100"
+            fill="#0c0c1e" stroke="#fff" stroke-width="2"/>
+      <text x="535" y="62" fill="#9999cc" font-size="11"
+            font-family="monospace" text-anchor="middle">GARDEROBE</text>
     </g>
 
-    <!-- EINGANGSBEREICH: x=390-590, y=90-240 -->
-    <g class="room-group" data-name="EINGANGSBEREICH" onclick="selectRoom(this)">
-      <rect class="bg" x="390" y="90" width="200" height="150" fill="#0d1620" stroke="#fff" stroke-width="2"/>
-      <text x="415" y="160" fill="#aabbcc" font-size="12" font-family="monospace">EINGANGS-</text>
-      <text x="415" y="178" fill="#aabbcc" font-size="12" font-family="monospace">BEREICH</text>
+    <!-- TREPPEN: oben rechts, volle Höhe, Eingang von der Straße -->
+    <g class="rg" data-name="TREPPEN  ↓ Straße" onclick="sel(this)">
+      <rect class="bg" x="600" y="10" width="170" height="600"
+            fill="#18180a" stroke="#fff" stroke-width="2"/>
+      <text x="685" y="320" fill="#cccc77" font-size="13"
+            font-family="monospace" text-anchor="middle"
+            transform="rotate(-90 685 320)">TREPPEN  ↓ Eingang Straße</text>
     </g>
 
-    <!-- TREPPEN: x=590-740, y=90-570 (runter = Eingang von der Straße) -->
-    <g class="room-group" data-name="TREPPEN (↓ Straße)" onclick="selectRoom(this)">
-      <rect class="bg" x="590" y="90" width="150" height="480" fill="#1a1a0d" stroke="#fff" stroke-width="2"/>
-      <text x="617" y="342" fill="#cccc88" font-size="12" font-family="monospace">TREPPEN</text>
-      <text x="613" y="360" fill="#777744" font-size="9" font-family="monospace">↓ Straße</text>
+    <!-- EINGANGSBEREICH: unter Garderobe, links von Treppen -->
+    <g class="rg" data-name="EINGANGSBEREICH" onclick="sel(this)">
+      <rect class="bg" x="470" y="110" width="130" height="120"
+            fill="#0c1520" stroke="#fff" stroke-width="2"/>
+      <text x="535" y="164" fill="#99bbcc" font-size="11"
+            font-family="monospace" text-anchor="middle">EINGANGS-</text>
+      <text x="535" y="181" fill="#99bbcc" font-size="11"
+            font-family="monospace" text-anchor="middle">BEREICH</text>
     </g>
 
-    <!-- ═══════════════════════════════════════════
-         FLUR 1: horizontaler Verbindungsflur
-         ═══════════════════════════════════════════ -->
-
-    <!-- FLUR 1: x=20-590, y=240-295 -->
-    <g class="room-group" data-name="FLUR 1" onclick="selectRoom(this)">
-      <rect class="bg" x="20" y="240" width="570" height="55" fill="#141414" stroke="#fff" stroke-width="2"/>
-      <text x="250" y="273" fill="#555" font-size="11" font-family="monospace">FLUR 1</text>
+    <!-- FLUR 1: volle Breite des Clubs (ganz links bis Treppen) -->
+    <g class="rg" data-name="FLUR 1" onclick="sel(this)">
+      <rect class="bg" x="20" y="230" width="580" height="55"
+            fill="#141414" stroke="#fff" stroke-width="2"/>
+      <text x="310" y="263" fill="#555" font-size="11"
+            font-family="monospace" text-anchor="middle">F L U R   1</text>
     </g>
 
-    <!-- ═══════════════════════════════════════════
-         UNTERE ETAGE: CHILLRAUM / WCs / FLUR 2
-         ═══════════════════════════════════════════ -->
-
-    <!-- FLUR 2: x=20-75, y=295-570 (vertikal, ganz links) -->
-    <g class="room-group" data-name="FLUR 2" onclick="selectRoom(this)">
-      <rect class="bg" x="20" y="295" width="55" height="275" fill="#141414" stroke="#fff" stroke-width="2"/>
-      <text x="47" y="432" fill="#555" font-size="11" font-family="monospace"
-            text-anchor="middle" transform="rotate(-90 47 432)">FLUR 2</text>
+    <!-- FLUR 2: schmaler Korridor ganz links, verbindet Flur 1 mit Chillraum -->
+    <g class="rg" data-name="FLUR 2" onclick="sel(this)">
+      <rect class="bg" x="20" y="285" width="50" height="140"
+            fill="#141414" stroke="#fff" stroke-width="2"/>
+      <text x="45" y="355" fill="#555" font-size="10"
+            font-family="monospace" text-anchor="middle"
+            transform="rotate(-90 45 355)">FLUR 2</text>
     </g>
 
-    <!-- CHILLRAUM: x=75-285, y=295-570 -->
-    <g class="room-group" data-name="CHILLRAUM" onclick="selectRoom(this)">
-      <rect class="bg" x="75" y="295" width="210" height="275" fill="#170e20" stroke="#fff" stroke-width="2"/>
-      <text x="148" y="422" fill="#ddccee" font-size="14" font-weight="bold" font-family="monospace">CHILL-</text>
-      <text x="148" y="442" fill="#ddccee" font-size="14" font-weight="bold" font-family="monospace">RAUM</text>
+    <!-- CHILLRAUM: großer Raum links unten, unter Flur 2 -->
+    <g class="rg" data-name="CHILLRAUM" onclick="sel(this)">
+      <rect class="bg" x="20" y="425" width="180" height="185"
+            fill="#140c1e" stroke="#fff" stroke-width="2"/>
+      <text x="110" y="510" fill="#ccbbee" font-size="14" font-weight="bold"
+            font-family="monospace" text-anchor="middle">CHILL-</text>
+      <text x="110" y="530" fill="#ccbbee" font-size="14" font-weight="bold"
+            font-family="monospace" text-anchor="middle">RAUM</text>
     </g>
 
-    <!-- TOILETTEN VORRAUM: x=285-450, y=295-395 -->
-    <g class="room-group" data-name="TOILETTEN VORRAUM" onclick="selectRoom(this)">
-      <rect class="bg" x="285" y="295" width="165" height="100" fill="#161616" stroke="#fff" stroke-width="2"/>
-      <text x="303" y="336" fill="#888" font-size="10" font-family="monospace">TOILETTEN</text>
-      <text x="309" y="351" fill="#888" font-size="10" font-family="monospace">VORRAUM</text>
+    <!-- TREPPE HOCH: ganz unten links, U-Gang zu Bendix-Plattform -->
+    <g class="rg" data-name="TREPPE HOCH" onclick="sel(this)">
+      <rect class="bg" x="20" y="610" width="130" height="60"
+            fill="#1c1408" stroke="#fff" stroke-width="2"/>
+      <text x="85" y="636" fill="#ffcc55" font-size="11"
+            font-family="monospace" text-anchor="middle">TREPPE</text>
+      <text x="85" y="653" fill="#ffcc55" font-size="11"
+            font-family="monospace" text-anchor="middle">HOCH</text>
     </g>
 
-    <!-- MÄNNER WC: x=285-450, y=395-570 -->
-    <g class="room-group" data-name="MÄNNER WC" onclick="selectRoom(this)">
-      <rect class="bg" x="285" y="395" width="165" height="175" fill="#0c0c1a" stroke="#fff" stroke-width="2"/>
-      <text x="325" y="475" fill="#7788ff" font-size="12" font-family="monospace">MÄNNER</text>
-      <text x="338" y="493" fill="#7788ff" font-size="12" font-family="monospace">WC</text>
+    <!-- MÄNNER WC: links vom Vorraum -->
+    <g class="rg" data-name="MÄNNER WC" onclick="sel(this)">
+      <rect class="bg" x="200" y="285" width="170" height="325"
+            fill="#0b0b1a" stroke="#fff" stroke-width="2"/>
+      <text x="285" y="442" fill="#6677ff" font-size="13"
+            font-family="monospace" text-anchor="middle">MÄNNER</text>
+      <text x="285" y="460" fill="#6677ff" font-size="13"
+            font-family="monospace" text-anchor="middle">WC</text>
     </g>
 
-    <!-- FRAUEN WC: x=450-590, y=295-570 -->
-    <g class="room-group" data-name="FRAUEN WC" onclick="selectRoom(this)">
-      <rect class="bg" x="450" y="295" width="140" height="275" fill="#1a0e18" stroke="#fff" stroke-width="2"/>
-      <text x="473" y="432" fill="#ff88bb" font-size="12" font-family="monospace">FRAUEN</text>
-      <text x="481" y="450" fill="#ff88bb" font-size="12" font-family="monospace">WC</text>
+    <!-- TOILETTEN VORRAUM: Mitte, Eingang von Flur 1 -->
+    <g class="rg" data-name="TOILETTEN VORRAUM" onclick="sel(this)">
+      <rect class="bg" x="370" y="285" width="130" height="100"
+            fill="#161616" stroke="#fff" stroke-width="2"/>
+      <text x="435" y="328" fill="#777" font-size="10"
+            font-family="monospace" text-anchor="middle">TOILETTEN</text>
+      <text x="435" y="344" fill="#777" font-size="10"
+            font-family="monospace" text-anchor="middle">VORRAUM</text>
     </g>
 
-    <!-- ═══════════════════════════════════════════
-         GANZ UNTEN: TREPPE HOCH (zur Bendix-Plattform)
-         ═══════════════════════════════════════════ -->
-
-    <!-- TREPPE HOCH: x=20-135, y=570-630 -->
-    <g class="room-group" data-name="TREPPE HOCH" onclick="selectRoom(this)">
-      <rect class="bg" x="20" y="570" width="115" height="58" fill="#1e1508" stroke="#fff" stroke-width="2"/>
-      <text x="30" y="597" fill="#ffcc55" font-size="10" font-family="monospace">TREPPE</text>
-      <text x="36" y="613" fill="#ffcc55" font-size="10" font-family="monospace">HOCH</text>
+    <!-- FRAUEN WC: rechts vom Vorraum -->
+    <g class="rg" data-name="FRAUEN WC" onclick="sel(this)">
+      <rect class="bg" x="500" y="285" width="100" height="325"
+            fill="#1a0c18" stroke="#fff" stroke-width="2"/>
+      <text x="550" y="442" fill="#ff77aa" font-size="13"
+            font-family="monospace" text-anchor="middle">FRAUEN</text>
+      <text x="550" y="460" fill="#ff77aa" font-size="13"
+            font-family="monospace" text-anchor="middle">WC</text>
     </g>
 
-    <!-- ═══════════════════════════════════════════
-         TÜRSTEHER (außen, rechts von TREPPEN)
-         ═══════════════════════════════════════════ -->
-    <text x="752" y="548" fill="#555" font-size="9" font-family="monospace">TUER-</text>
-    <text x="749" y="560" fill="#555" font-size="9" font-family="monospace">STEHER</text>
-    <!-- Strichmännchen -->
-    <circle cx="762" cy="508" r="7" fill="none" stroke="#444" stroke-width="1.5"/>
-    <line x1="762" y1="515" x2="762" y2="535" stroke="#444" stroke-width="1.5"/>
-    <line x1="750" y1="522" x2="774" y2="522" stroke="#444" stroke-width="1.5"/>
-    <line x1="762" y1="535" x2="752" y2="548" stroke="#444" stroke-width="1.5"/>
-    <line x1="762" y1="535" x2="772" y2="548" stroke="#444" stroke-width="1.5"/>
+    <!-- ══════════════════════════════════
+         DURCHGÄNGE
+         Technik: Wand mit Hintergrundfarbe (#111) überdecken
+         ══════════════════════════════════ -->
+
+    <!-- 1. TREPPEN → EINGANGSBEREICH (vertikale Wand bei x=600, y=155–185) -->
+    <rect x="598" y="155" width="5" height="30" fill="#111" stroke="none"/>
+
+    <!-- 2. GARDEROBE ↔ EINGANGSBEREICH (horizontale Wand bei y=110, x=505–540) -->
+    <rect x="505" y="107" width="35" height="6" fill="#111" stroke="none"/>
+
+    <!-- 3. EINGANGSBEREICH → FLUR 1 (horizontale Wand bei y=230, x=500–535) -->
+    <rect x="500" y="228" width="35" height="6" fill="#111" stroke="none"/>
+
+    <!-- 4. FLUR 1 → DANCEFLOOR (breite Öffnung bei y=230, x=140–270) -->
+    <rect x="140" y="228" width="130" height="6" fill="#111" stroke="none"/>
+
+    <!-- 5. FLUR 1 → FLUR 2 (nahtlos, y=285, volle Breite von FLUR 2: x=20–70) -->
+    <rect x="20" y="283" width="50" height="6" fill="#111" stroke="none"/>
+
+    <!-- 6. FLUR 1 → TOILETTEN VORRAUM (y=285, x=393–427) -->
+    <rect x="393" y="283" width="34" height="6" fill="#111" stroke="none"/>
+
+    <!-- 7. FLUR 2 → CHILLRAUM (nahtlos, y=425, volle Breite FLUR 2: x=20–70) -->
+    <rect x="20" y="423" width="50" height="6" fill="#111" stroke="none"/>
+
+    <!-- 8. VORRAUM → MÄNNER WC (vertikale Wand x=370, y=312–342) -->
+    <rect x="368" y="312" width="5" height="30" fill="#111" stroke="none"/>
+
+    <!-- 9. VORRAUM → FRAUEN WC (vertikale Wand x=500, y=312–342) -->
+    <rect x="498" y="312" width="5" height="30" fill="#111" stroke="none"/>
+
+    <!-- 10. CHILLRAUM → TREPPE HOCH (y=610, x=42–88) -->
+    <rect x="42" y="608" width="46" height="6" fill="#111" stroke="none"/>
+
+    <!-- ══════════════════════════════════
+         TÜRSTEHER (außen, rechts von Treppen)
+         ══════════════════════════════════ -->
+    <circle cx="752" cy="628" r="8" fill="none" stroke="#3a3a3a" stroke-width="1.5"/>
+    <line x1="752" y1="636" x2="752" y2="656" stroke="#3a3a3a" stroke-width="1.5"/>
+    <line x1="740" y1="643" x2="764" y2="643" stroke="#3a3a3a" stroke-width="1.5"/>
+    <line x1="752" y1="656" x2="742" y2="670" stroke="#3a3a3a" stroke-width="1.5"/>
+    <line x1="752" y1="656" x2="762" y2="670" stroke="#3a3a3a" stroke-width="1.5"/>
+    <text x="752" y="684" fill="#3a3a3a" font-size="9"
+          font-family="monospace" text-anchor="middle">TÜRSTEHER</text>
 
   </svg>
 
   <div id="info">Klicke auf einen Raum</div>
-  <div id="legend">v0.1 — nur Grundrechtecke — noch keine Türen / Details</div>
 
   <script>
-    let current = null;
-
-    function selectRoom(g) {
-      const STROKE_DEFAULT = '#ffffff';
-      const STROKE_SELECTED = '#ffff00';
-      const W_DEFAULT = '2';
-      const W_SELECTED = '3';
-
-      if (current) {
-        const r = current.querySelector('rect.bg');
-        r.setAttribute('stroke', STROKE_DEFAULT);
-        r.setAttribute('stroke-width', W_DEFAULT);
+    let cur = null;
+    function sel(g) {
+      if (cur) {
+        cur.querySelector('rect.bg').setAttribute('stroke', '#fff');
+        cur.querySelector('rect.bg').setAttribute('stroke-width', '2');
       }
-
-      if (current === g) {
-        current = null;
+      if (cur === g) {
+        cur = null;
         document.getElementById('info').textContent = 'Klicke auf einen Raum';
         return;
       }
-
-      const rect = g.querySelector('rect.bg');
-      rect.setAttribute('stroke', STROKE_SELECTED);
-      rect.setAttribute('stroke-width', W_SELECTED);
-      current = g;
+      g.querySelector('rect.bg').setAttribute('stroke', '#ffff00');
+      g.querySelector('rect.bg').setAttribute('stroke-width', '3');
+      cur = g;
       document.getElementById('info').textContent = '► ' + g.dataset.name;
     }
   </script>
