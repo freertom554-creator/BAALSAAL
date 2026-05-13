@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Baalsaal Simulator</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; font-family: 'Courier New', monospace; }
+canvas { display: block; }
+</style>
+</head>
+<body>
+<canvas id="c" width="800" height="540"></canvas>
+<script>
+/* ═══════════════════════════════════════════════
+   BAALSAAL SIMULATOR — v0.1
+   Screen 1: Title + Exterior
+   Screen 2: Eingangsbereich / Treppe
+═══════════════════════════════════════════════ */
+const C = document.getElementById('c');
+const ctx = C.getContext('2d');
+const W = 800, H = 540, SH = 368, UIY = 368, UIH = 172;
+
+/* ── state ── */
+const G = {
+  screen: 'title',
+  dialog: null,
+  inventory: [],
+  flags: {},
+};
+
+let hotspots = [], mx = 0, my = 0;
+
+/* ── map rooms (from JSON) for minimap ── */
+const MAP = [
+  { type:'dancefloor',    x: 60,y: 60,w:580,h:200, s:'dancefloor' },
+  { type:'garderobe',     x:600,y:320,w: 60,h: 40, s:'garderobe'  },
+  { type:'treppenrunter', x:720,y:480,w: 80,h:140, s:'exterior'   },
+  { type:'eingang',       x:600,y:360,w:200,h:120, s:'entrance'   },
+  { type:'flur1',         x:140,y:360,w:460,h: 80, s:'flur1'      },
+  { type:'flur2',         x: 60,y:260,w: 80,h:240, s:'flur2'      },
+  { type:'maennerwc',     x:440,y:500,w: 60,h: 60, s:'maennerwc'  },
+  { type:'vorraum',       x:440,y:440,w:160,h: 60, s:'vorraum'    },
+  { type:'frauenwc',      x:540,y:500,w: 60,h: 60, s:'frauenwc'   },
+  { type:'chillraum',     x: 60,y:500,w:200,h:160, s:'chillraum'  },
+  { type:'treppehoch',    x:  0,y:500,w: 60,h:160, s:'treppehoch' },
+];
+
+/* ── utils ── */
+const over = (x,y,w,h) => mx>=x && mx<=x+w && my>=y && my<=y+h;
+const push  = (x,y,w,h,fn) => hotspots.push({x,y,w,h,fn});
+
+function neon(col, blur=20) { ctx.shadowColor=col; ctx.shadowBlur=blur; }
+function noN()               { ctx.shadowBlur=0; }
+
+function grad(x1,y1,x2,y2,...stops) {
+  const g = ctx.createLinearGradient(x1,y1,x2,y2);
+  stops.forEach(([t,c]) => g.addColorStop(t,c));
+  return g;
+}
+
+function txt(s,x,y,size,col,align='center',base='top') {
+  ctx.font=`${size}px monospace`; ctx.fillStyle=col;
+  ctx.textAlign=align; ctx.textBaseline=base; ctx.fillText(s,x,y);
+}
+function txtB(s,x,y,size,col,align='center',base='top') {
+  ctx.font=`bold ${size}px monospace`; ctx.fillStyle=col;
+  ctx.textAlign=align; ctx.textBaseline=base; ctx.fillText(s,x,y);
+}
+
+/* ── goto + dialog ── */
+function go(scr) { G.screen=scr; G.dialog=null; }
+function dlg(speaker,col,text,choices) {
+  G.dialog = { speaker, col, text, choices: choices||null };
+}
+
+/* ── minimap ── */
+function drawMinimap() {
+  const MX=W-132, MY=6, MW=126, MH=96;
+  ctx.fillStyle='rgba(0,0,0,0.88)'; ctx.strokeStyle='#252525'; ctx.lineWidth=1;
+  ctx.fillRect(MX,MY,MW,MH); ctx.strokeRect(MX,MY,MW,MH);
+  const sx=MW/820, sy=MH/680, ox=MX+1, oy=MY+1;
+  MAP.forEach(r => {
+    const cur = r.s===G.screen;
+    ctx.fillStyle   = cur ? 'rgba(255,200,0,0.45)' : 'rgba(30,30,45,0.9)';
+    ctx.strokeStyle = cur ? '#ffcc00' : '#282828';
+    ctx.lineWidth   = cur ? 1.5 : 0.5;
+    ctx.fillRect(ox+r.x*sx, oy+r.y*sy, r.w*sx, r.h*sy);
+    ctx.strokeRect(ox+r.x*sx, oy+r.y*sy, r.w*sx, r.h*sy);
+    if(cur){ ctx.fillStyle='#ffcc00'; ctx.beginPath(); ctx.arc(ox+r.x*sx+r.w*sx/2, oy+r.y*sy+r.h*sy/2,2,0,Math.PI*2); ctx.fill(); }
+  });
+  ctx.font='6px monospace'; ctx.fillStyle='#282828'; ctx.textAlign='left';
+  ctx.fillText('MINIMAP', MX+2, MY+MH-2);
+}
+
+/* ── UI / dialog ── */
+function drawUI() {
+  ctx.fillStyle='#060606'; ctx.fillRect(0,UIY,W,UIH);
+  ctx.strokeStyle='#1a1a1a'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(0,UIY); ctx.lineTo(W,UIY); ctx.stroke();
+
+  hotspots = hotspots.filter(h=>h.scene); // keep only scene hotspots
+
+  if(!G.dialog) {
+    txt('Klicke auf markierte Bereiche um zu interagieren.',W/2,UIY+14,10,'#222','center','top');
+    return;
+  }
+  const d=G.dialog;
+  let ty = UIY+10;
+
+  if(d.speaker) {
+    neon(d.col||'#888', 8);
+    txtB(`[ ${d.speaker} ]`,14,ty,11,d.col||'#aaa','left');
+    noN(); ty+=20;
+  }
+
+  // Word-wrap text
+  ctx.font='12px monospace';
+  const words=d.text.split(' '), maxW=W-28;
+  let line='', lines=[];
+  words.forEach(w=>{ const t=line+(line?' ':'')+w; if(ctx.measureText(t).width>maxW&&line){lines.push(line);line=w;}else line=t; });
+  if(line)lines.push(line);
+  lines.forEach((l,i)=>{ ctx.fillStyle='#ccc'; ctx.textAlign='left'; ctx.textBaseline='top'; ctx.fillText(l,14,ty+i*16); });
+
+  // Choices or "continue"
+  const botY = UIY+UIH-44;
+  ctx.strokeStyle='#161616'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(0,botY-4); ctx.lineTo(W,botY-4); ctx.stroke();
+
+  if(d.choices && d.choices.length) {
+    let cx=14;
+    d.choices.forEach(ch => {
+      ctx.font='11px monospace';
+      const cw = ctx.measureText(ch.label).width + 22;
+      const hov = over(cx,botY,cw,30);
+      ctx.fillStyle = hov?'#1c1c1c':'#0e0e0e';
+      ctx.strokeStyle = hov?'#666':'#282828';
+      ctx.lineWidth=1; ctx.fillRect(cx,botY,cw,30); ctx.strokeRect(cx,botY,cw,30);
+      ctx.fillStyle=hov?'#fff':'#777'; ctx.textAlign='left'; ctx.textBaseline='top';
+      ctx.fillText(ch.label, cx+10, botY+10);
+      push(cx,botY,cw,30,ch.fn);
+      cx += cw+8;
+    });
+  } else {
+    const hov=over(W-115,botY,105,28);
+    ctx.fillStyle=hov?'#aaa':'#333'; ctx.textAlign='right'; ctx.textBaseline='top';
+    ctx.font='10px monospace'; ctx.fillText('[WEITER →]',W-14,botY+10);
+    push(W-115,botY,105,28,()=>G.dialog=null);
+  }
+}
+
+/* ── nav arrow ── */
+function arrow(dir, label, fn) {
+  let x,y,aw=50,ah=44;
+  if(dir==='left')  { x=0;       y=SH/2-22; aw=44; }
+  if(dir==='right') { x=W-44;    y=SH/2-22; aw=44; }
+  if(dir==='down')  { x=W/2-55;  y=SH-50;   aw=110; }
+  if(dir==='up')    { x=W/2-55;  y=6;        aw=110; }
+  const hov=over(x,y,aw,ah);
+  ctx.fillStyle=hov?'rgba(255,200,0,0.12)':'rgba(0,0,0,0)';
+  ctx.strokeStyle=hov?'rgba(255,200,0,0.5)':'rgba(255,255,255,0.06)';
+  ctx.lineWidth=1; ctx.fillRect(x,y,aw,ah); ctx.strokeRect(x,y,aw,ah);
+  const sym={left:'←',right:'→',down:'↓',up:'↑'}[dir];
+  txtB(sym,x+aw/2,y+6,22,hov?'#ffcc00':'#2a2a2a');
+  txt(label,x+aw/2,y+ah-14,8,hov?'#cc9900':'#1e1e1e');
+  push(x,y,aw,ah,fn);
+}
+
+/* ── bouncer sprite ── */
+function bouncer(x,y) {
+  // body
+  ctx.fillStyle='#111'; ctx.strokeStyle='#333'; ctx.lineWidth=2;
+  ctx.fillRect(x-22,y-62,44,62); ctx.strokeRect(x-22,y-62,44,62);
+  // suit lapels
+  ctx.fillStyle='#1a1a1a'; ctx.beginPath();
+  ctx.moveTo(x-5,y-62); ctx.lineTo(x-12,y-30); ctx.lineTo(x,y-40); ctx.lineTo(x+12,y-30); ctx.lineTo(x+5,y-62); ctx.fill();
+  // arms
+  ctx.strokeStyle='#0f0f0f'; ctx.lineWidth=12;
+  ctx.beginPath(); ctx.moveTo(x-22,y-50); ctx.lineTo(x-38,y-18); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x+22,y-50); ctx.lineTo(x+38,y-18); ctx.stroke();
+  // hands
+  ctx.fillStyle='#2a1a0a'; ctx.beginPath(); ctx.arc(x-38,y-15,6,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x+38,y-15,6,0,Math.PI*2); ctx.fill();
+  // head
+  ctx.fillStyle='#2a1808'; ctx.strokeStyle='#444'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.arc(x,y-74,16,0,Math.PI*2); ctx.fill(); ctx.stroke();
+  // earpiece
+  ctx.strokeStyle='#555'; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.arc(x+14,y-74,3,0,Math.PI*2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x+14,y-71); ctx.lineTo(x+14,y-62); ctx.stroke();
+  // label
+  txt('TÜRSTEHER',x,y+8,9,'#3a3a3a');
+}
+
+/* ════════════════════════════════════════
+   SCREEN: TITLE
+════════════════════════════════════════ */
+function drawTitle() {
+  ctx.fillStyle='#000'; ctx.fillRect(0,0,W,SH);
+  // stars
+  for(let i=0;i<60;i++){ ctx.fillStyle='rgba(255,255,255,0.06)'; ctx.fillRect((i*173+7)%W,(i*97+3)%SH,1,1); }
+
+  // club silhouette
+  ctx.fillStyle='#060606';
+  ctx.fillRect(0, SH-110, W, 110);
+  // windows
+  [[80,60],[640,60]].forEach(([wx,ww])=>{
+    ctx.fillStyle='#060108'; ctx.fillRect(wx,SH-100,ww,60);
+    neon('#330022',15); ctx.strokeStyle='rgba(60,0,30,0.5)'; ctx.lineWidth=1; ctx.strokeRect(wx,SH-100,ww,60); noN();
+  });
+  // door silhouette
+  ctx.fillStyle='#030303'; ctx.fillRect(355,SH-110,90,110);
+
+  // BAALSAAL neon title
+  neon('#ff0033',50);
+  txtB('BAALSAAL',W/2,90,62,'#ff1144');
+  neon('#ff0033',90);
+  ctx.globalAlpha=0.18;
+  txtB('BAALSAAL',W/2,90,62,'#ff1144');
+  ctx.globalAlpha=1; noN();
+
+  txtB('S I M U L A T O R',W/2,162,14,'#551122');
+
+  // divider
+  neon('#330011',8); ctx.strokeStyle='#661122'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(W/2-160,186); ctx.lineTo(W/2+160,186); ctx.stroke(); noN();
+
+  txt('ein point-and-click adventure · hamburg · reeperbahn',W/2,200,10,'#2a2a2a');
+
+  // PLAY button
+  const bx=W/2-85,by=248,bw=170,bh=48;
+  const hov=over(bx,by,bw,bh);
+  neon(hov?'#ff4400':'#660000', hov?35:18);
+  ctx.fillStyle=hov?'#1a0800':'#0d0300'; ctx.strokeStyle=hov?'#ff4400':'#440000'; ctx.lineWidth=1.5;
+  ctx.fillRect(bx,by,bw,bh); ctx.strokeRect(bx,by,bw,bh);
+  txtB('▶  SPIELEN',W/2,by+12,18,hov?'#ff6600':'#661100');
+  noN();
+  push(bx,by,bw,bh,()=>go('exterior'));
+
+  txt('BAALSAAL HAMBURG · REEPERBAHN 136',W/2,SH-18,9,'#151515');
+}
+
+/* ════════════════════════════════════════
+   SCREEN: EXTERIOR — VOR DEM CLUB
+════════════════════════════════════════ */
+function drawExterior() {
+  // Sky
+  ctx.fillStyle=grad(0,0,0,SH,[0,'#01020a'],[1,'#040610']); ctx.fillRect(0,0,W,SH);
+
+  // Building facade
+  ctx.fillStyle='#060606'; ctx.fillRect(0,0,W,SH-80);
+  // brick texture
+  ctx.strokeStyle='rgba(255,255,255,0.018)'; ctx.lineWidth=1;
+  for(let ry=0;ry<SH-80;ry+=16){ ctx.beginPath();ctx.moveTo(0,ry);ctx.lineTo(W,ry);ctx.stroke(); }
+
+  // Sidewalk
+  ctx.fillStyle=grad(0,SH-82,0,SH,[0,'#0e0e0e'],[1,'#080808']); ctx.fillRect(0,SH-82,W,82);
+  // sidewalk lines
+  ctx.strokeStyle='rgba(255,255,255,0.025)'; ctx.lineWidth=1;
+  for(let rx=0;rx<W;rx+=80){ ctx.beginPath();ctx.moveTo(rx,SH-82);ctx.lineTo(rx,SH);ctx.stroke(); }
+
+  // Side windows
+  [[55,110],[635,110]].forEach(([wx,ww])=>{
+    ctx.fillStyle='#08020a'; ctx.strokeStyle='#1a0020'; ctx.lineWidth=2;
+    ctx.fillRect(wx,40,ww,90); ctx.strokeRect(wx,40,ww,90);
+    neon('#440033',25); ctx.strokeStyle='rgba(60,0,40,0.35)'; ctx.strokeRect(wx+3,43,ww-6,84); noN();
+    // window cross
+    ctx.strokeStyle='#120018'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(wx+ww/2,40); ctx.lineTo(wx+ww/2,130); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(wx,85); ctx.lineTo(wx+ww,85); ctx.stroke();
+  });
+
+  // ── DOOR ──
+  const DX=350, DY=SH-82-162, DW=100, DH=162;
+  // door frame/arch
+  ctx.fillStyle='#180e00'; ctx.strokeStyle='#3a2200'; ctx.lineWidth=3;
+  ctx.fillRect(DX-10,DY-4,DW+20,DH+4); ctx.strokeRect(DX-10,DY-4,DW+20,DH+4);
+  // door face
+  ctx.fillStyle='#030202'; ctx.fillRect(DX,DY,DW,DH);
+  // door panels
+  ctx.strokeStyle='#130a0a'; ctx.lineWidth=1;
+  [[DX+5,DY+8,DW/2-8,DH/2-12],[DX+DW/2+3,DY+8,DW/2-8,DH/2-12],
+   [DX+5,DY+DH/2+4,DW/2-8,DH/2-14],[DX+DW/2+3,DY+DH/2+4,DW/2-8,DH/2-14]]
+  .forEach(([rx,ry,rw,rh])=>{ ctx.strokeRect(rx,ry,rw,rh); });
+  // handle
+  ctx.fillStyle='#4a3800'; ctx.beginPath(); ctx.arc(DX+DW-14,DY+DH/2,4,0,Math.PI*2); ctx.fill();
+
+  // ── BAALSAAL NEON SIGN ──
+  const SY=DY-52;
+  neon('#ff0033',45); txtB('BAALSAAL',W/2,SY,34,'#ff1144'); noN();
+  neon('#ff0033',80); ctx.globalAlpha=0.15; txtB('BAALSAAL',W/2,SY,34,'#ff1144'); ctx.globalAlpha=1; noN();
+  // underbar
+  neon('#ff0033',12); ctx.strokeStyle='#cc0033'; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.moveTo(W/2-118,SY+10); ctx.lineTo(W/2+118,SY+10); ctx.stroke(); noN();
+
+  // ── GREEN NEON TUBE ──
+  const TX=DX-28, TY1=DY+8, TY2=DY+DH-12;
+  neon('#00ff44',22); ctx.strokeStyle='#00ee44'; ctx.lineWidth=4;
+  ctx.beginPath(); ctx.moveTo(TX,TY1); ctx.lineTo(TX,TY2); ctx.stroke();
+  neon('#00ff44',55); ctx.strokeStyle='rgba(0,255,70,0.2)'; ctx.lineWidth=16;
+  ctx.beginPath(); ctx.moveTo(TX,TY1); ctx.lineTo(TX,TY2); ctx.stroke(); noN();
+
+  // ── CROWD (queue, left side) ──
+  const people=[{x:60,c:'#221020'},{x:110,c:'#1a1520'},{x:155,c:'#201018'},{x:195,c:'#1a1a1a'},{x:230,c:'#181220'}];
+  people.forEach(p=>{
+    ctx.fillStyle=p.c; ctx.strokeStyle='rgba(255,255,255,0.04)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.arc(p.x, SH-83,10,0,Math.PI); ctx.fill();
+    ctx.fillRect(p.x-10,SH-83,20,28); ctx.strokeRect(p.x-10,SH-83,20,28);
+  });
+
+  // ── TÜRSTEHER ──
+  bouncer(DX+DW+60, SH-80);
+
+  // Hotspots
+  // Bouncer / door area
+  const trigY = DY-10, trigH = SH-80-trigY+10;
+  push(DX-14,trigY,DW+28+90,trigH, ()=>dlg(
+    'TÜRSTEHER','#777',
+    'Hm. Ticket, Gästeliste oder warten?',
+    [
+      {label:'[Ticket zeigen]', fn:()=>dlg('TÜRSTEHER','#777','Alles klar. Komm rein.',[
+        {label:'[Eintreten]', fn:()=>go('entrance')}
+      ])},
+      {label:'[Auf Liste verweisen]', fn:()=>dlg('TÜRSTEHER','#777','"Liste"... wie heißt du?',[
+        {label:'[Name sagen]', fn:()=>dlg('TÜRSTEHER','#777','Mmh. Seh dich nicht. Warte kurz.',null)}
+      ])},
+      {label:'[Einfach warten]', fn:()=>dlg(null,null,'Du stellst dich in die Schlange. Bass dröhnt durch die Wand.',[
+        {label:'[Geduldig warten...]', fn:()=>dlg('TÜRSTEHER','#777','Ok. Sei anständig da drinnen.',[
+          {label:'[Rein!]', fn:()=>go('entrance')}
+        ])}
+      ])},
+    ]
+  ));
+
+  // Crowd click
+  push(30,SH-120,250,40,()=>dlg(null,null,'Eine Mischung aus Neugierigen, Stammgästen und Leuten die einfach hier hängen.',null));
+}
+
+/* ════════════════════════════════════════
+   SCREEN: ENTRANCE — TREPPE RUNTER
+════════════════════════════════════════ */
+function drawEntrance() {
+  ctx.fillStyle='#030303'; ctx.fillRect(0,0,W,SH);
+
+  // Ceiling
+  ctx.fillStyle=grad(0,0,0,55,[0,'#080808'],[1,'#030303']); ctx.fillRect(0,0,W,55);
+
+  // ── STAIRCASE (perspective, down) ──
+  const steps=9, cx2=W/2;
+  const stX1=175, stX2=625, stTY=55, stBY=SH-55;
+
+  // warm glow from below
+  ctx.fillStyle=grad(cx2,SH,cx2,SH-200,[0,'rgba(80,30,0,0.45)'],[1,'rgba(0,0,0,0)']);
+  ctx.fillRect(stX1,stBY-180,stX2-stX1,180);
+
+  for(let i=0;i<steps;i++){
+    const t=i/steps, t2=(i+1)/steps;
+    // perspective: converge toward center-top
+    const x1=cx2+(stX1-cx2)*(1-t), x2=cx2+(stX2-cx2)*(1-t);
+    const x3=cx2+(stX1-cx2)*(1-t2), x4=cx2+(stX2-cx2)*(1-t2);
+    const y1=stTY+(stBY-stTY)*t, y2=stTY+(stBY-stTY)*t2;
+    const br=0.03+t*0.07;
+    // step face
+    ctx.fillStyle=`rgb(${Math.round(br*120+4)},${Math.round(br*80+3)},${Math.round(br*55+2)})`;
+    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y1); ctx.lineTo(x4,y2); ctx.lineTo(x3,y2); ctx.closePath(); ctx.fill();
+    // tread highlight
+    ctx.strokeStyle=`rgba(${Math.round(br*230+15)},${Math.round(br*120+8)},${Math.round(br*60+4)},0.4)`;
+    ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y1); ctx.stroke();
+  }
+
+  // Left wall panel
+  ctx.fillStyle='#080808';
+  ctx.beginPath();
+  ctx.moveTo(0,0); ctx.lineTo(stX1,stTY); ctx.lineTo(stX1*0.3+cx2*0.1,SH); ctx.lineTo(0,SH); ctx.closePath(); ctx.fill();
+  // Right wall panel
+  ctx.beginPath();
+  ctx.moveTo(W,0); ctx.lineTo(stX2,stTY); ctx.lineTo(stX2*0.3+cx2*0.8,SH); ctx.lineTo(W,SH); ctx.closePath(); ctx.fill();
+
+  // Wall detail lines (left)
+  ctx.strokeStyle='rgba(255,255,255,0.02)'; ctx.lineWidth=1;
+  for(let i=0;i<4;i++){ const fx=30+i*25; ctx.beginPath(); ctx.moveTo(fx,0); ctx.lineTo(stX1+fx*0.3,SH); ctx.stroke(); }
+
+  // Handrail (right side)
+  const rail=(t)=>({ rx: cx2+(stX2-cx2)*(1-t)+12, ry: stTY+(stBY-stTY)*t-28 });
+  ctx.strokeStyle='#3a1e00'; ctx.lineWidth=3;
+  ctx.beginPath();
+  for(let i=0;i<=20;i++){ const p=rail(i/20); i?ctx.lineTo(p.rx,p.ry):ctx.moveTo(p.rx,p.ry); }
+  ctx.stroke();
+  // posts
+  ctx.lineWidth=2;
+  for(let i=0;i<=steps;i++){
+    const t=i/steps, p=rail(t), by=stTY+(stBY-stTY)*t;
+    ctx.beginPath(); ctx.moveTo(p.rx,p.ry); ctx.lineTo(p.rx,by); ctx.stroke();
+  }
+
+  // ── GARDEROBE WINDOW (right wall) ──
+  const GX=W-118, GY=70, GW=90, GH=120;
+  ctx.fillStyle='#0c0608'; ctx.strokeStyle='#2a1200'; ctx.lineWidth=2;
+  ctx.fillRect(GX,GY,GW,GH); ctx.strokeRect(GX,GY,GW,GH);
+  // counter
+  ctx.fillStyle='#180c00'; ctx.fillRect(GX,GY+GH-28,GW,28);
+  ctx.strokeStyle='#2a1400'; ctx.lineWidth=1; ctx.strokeRect(GX,GY+GH-28,GW,28);
+  // person behind counter
+  ctx.fillStyle='#302010'; ctx.beginPath(); ctx.arc(GX+GW/2,GY+34,14,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#1a100a'; ctx.fillRect(GX+GW/2-12,GY+48,24,30);
+  txt('GARDE-',GX+GW/2,GY+GH-22,7,'#553311');
+  txt('ROBE',GX+GW/2,GY+GH-11,7,'#553311');
+
+  // hover effect garderobe
+  const ghov=over(GX-5,GY-5,GW+10,GH+10);
+  if(ghov){ neon('#ffcc00',10); ctx.strokeStyle='rgba(255,200,0,0.4)'; ctx.lineWidth=1.5; ctx.strokeRect(GX-3,GY-3,GW+6,GH+6); noN(); }
+  push(GX-5,GY-5,GW+10,GH+10,()=>go('garderobe'));
+
+  // ── POSTER (left wall) ──
+  ctx.fillStyle='#060310'; ctx.strokeStyle='#110025'; ctx.lineWidth=1;
+  ctx.fillRect(22,80,68,88); ctx.strokeRect(22,80,68,88);
+  neon('#6600cc',8); txtB('TONIGHT',56,96,7,'#8800ff'); txtB('DJ',56,110,7,'#7700ee'); txtB('KEPLER',56,122,7,'#8800ff'); noN();
+  txt('22:00 · 8€',56,152,6,'#330055');
+
+  // Arrows
+  arrow('left','ZURÜCK',()=>go('exterior'));
+  arrow('down','ZUM CLUB',()=>go('flur1'));
+}
+
+/* ════════════════════════════════════════
+   STUB SCREENS
+════════════════════════════════════════ */
+function drawStub(label, backScr) {
+  ctx.fillStyle='#060608'; ctx.fillRect(0,0,W,SH);
+  // grid
+  ctx.strokeStyle='rgba(255,255,255,0.02)'; ctx.lineWidth=1;
+  for(let x=0;x<W;x+=40){ ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,SH);ctx.stroke(); }
+  for(let y=0;y<SH;y+=40){ ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke(); }
+  txtB(label,W/2,SH/2-24,18,'#2a2a2a');
+  txt('— in Entwicklung —',W/2,SH/2+4,11,'#1a1a1a');
+  arrow('left','ZURÜCK',()=>go(backScr));
+}
+
+/* ════════════════════════════════════════
+   RENDER LOOP
+════════════════════════════════════════ */
+const SCREENS = {
+  title:     ()=>drawTitle(),
+  exterior:  ()=>drawExterior(),
+  entrance:  ()=>drawEntrance(),
+  garderobe: ()=>drawStub('GARDEROBE','entrance'),
+  flur1:     ()=>drawStub('FLUR 1','entrance'),
+  dancefloor:()=>drawStub('DANCEFLOOR','flur1'),
+  chillraum: ()=>drawStub('CHILLRAUM','flur1'),
+};
+
+function render() {
+  hotspots = [];
+  ctx.clearRect(0,0,W,H);
+  (SCREENS[G.screen]||SCREENS.title)();
+  drawUI();
+  if(G.screen!=='title') drawMinimap();
+  C.style.cursor = hotspots.find(h=>over(h.x,h.y,h.w,h.h)) ? 'pointer' : 'default';
+  requestAnimationFrame(render);
+}
+
+/* ── input ── */
+C.addEventListener('mousemove', e=>{
+  const r=C.getBoundingClientRect(); mx=e.clientX-r.left; my=e.clientY-r.top;
+});
+C.addEventListener('click', e=>{
+  const r=C.getBoundingClientRect(), cx=e.clientX-r.left, cy=e.clientY-r.top;
+  for(let i=hotspots.length-1;i>=0;i--){
+    const h=hotspots[i];
+    if(cx>=h.x&&cx<=h.x+h.w&&cy>=h.y&&cy<=h.y+h.h){ if(h.fn)h.fn(); break; }
+  }
+});
+
+render();
+</script>
+</body>
+</html>
