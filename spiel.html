@@ -99,8 +99,6 @@ function drawUI() {
   ctx.strokeStyle='#1a1a1a'; ctx.lineWidth=1;
   ctx.beginPath(); ctx.moveTo(0,UIY); ctx.lineTo(W,UIY); ctx.stroke();
 
-  hotspots = hotspots.filter(h=>h.scene); // keep only scene hotspots
-
   if(!G.dialog) {
     txt('Klicke auf markierte Bereiche um zu interagieren.',W/2,UIY+14,10,'#222','center','top');
     return;
