@@ -245,19 +245,6 @@ const TEMPLATES=[
   noglow();
 }},
 
-{cat:'Wireframe / 3D',name:'Neon Boxes',draw:(g,w,h,f,wv,t,e)=>{ // glowing nested rectangular frames
-  const cx=w/2,cy=h/2,foc=w*1.6;g.lineWidth=2;glow(16);
-  const box=(sz,dep,a)=>{const c=[[-1,-1],[1,-1],[1,1],[-1,1]];const f0=[],b0=[];
-    c.forEach(([px,py])=>{let[x,y,z]=rot3(px*sz,py*sz*0.6,-dep,0.35,ROT*0.3);f0.push(proj(x,y,z,cx,cy,foc));
-      [x,y,z]=rot3(px*sz,py*sz*0.6,dep,0.35,ROT*0.3);b0.push(proj(x,y,z,cx,cy,foc));});
-    g.strokeStyle=ic(a);
-    const poly=p=>{g.beginPath();p.forEach(([x,y],i)=>i?g.lineTo(x,y):g.moveTo(x,y));g.closePath();g.stroke();};
-    poly(f0);poly(b0);for(let i=0;i<4;i++){g.beginPath();g.moveTo(f0[i][0],f0[i][1]);g.lineTo(b0[i][0],b0[i][1]);g.stroke();}};
-  box(Math.min(w,h)*0.34*(1+e.bass*0.15),Math.min(w,h)*0.16,0.5+e.beat*0.4);
-  box(Math.min(w,h)*0.2,Math.min(w,h)*0.1,0.3+e.mid*0.3);
-  noglow();
-}},
-
 {cat:'Wireframe / 3D',name:'Vortex Tunnel',draw:(g,w,h,f,wv,t,e)=>{
   const cx=w/2,cy=h/2;g.lineWidth=1.4;glow(10);
   for(let i=20;i>0;i--){ const p=((t*0.35+i)%20)/20,s=Math.pow(1-p,1.8);
@@ -268,19 +255,6 @@ const TEMPLATES=[
   } noglow();
 }},
 
-{cat:'Wireframe / 3D',name:'Cube Swarm',draw:(g,w,h,f,wv,t,e)=>{
-  const cx=w/2,cy=h/2,foc=w*1.5;g.lineWidth=1;
-  const cube=(ox,oy,oz,sz,a)=>{const v=[];for(let i=0;i<8;i++){const px=(i&1?1:-1)*sz,py=(i&2?1:-1)*sz,pz=(i&4?1:-1)*sz;
-    let[x,y,z]=rot3(px,py,pz,ROT*0.6+a,ROT+a);v.push(proj(x+ox,y+oy,z+oz,cx,cy,foc));}
-    const E=[[0,1],[1,3],[3,2],[2,0],[4,5],[5,7],[7,6],[6,4],[0,4],[1,5],[2,6],[3,7]];
-    g.strokeStyle=lc(0.2+e.mid*0.4+e.high*0.15);g.beginPath();
-    E.forEach(([a,b])=>{g.moveTo(v[a][0],v[a][1]);g.lineTo(v[b][0],v[b][1]);});g.stroke();};
-  const sz=Math.min(w,h)*0.05*(1+e.bass*0.3),spacing=Math.min(w,h)*0.22*(1+e.beat*0.15);
-  glow(8);
-  for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++){cube(i*spacing,j*spacing,0,sz,i*0.4+j*0.4);}
-  noglow();
-}},
-
 /* ===== GENERATIVE ===== */
 {cat:'Generative',name:'Phyllotaxis',draw:(g,w,h,f,wv,t,e)=>{ // fibonacci dot spiral (screenshot #7)
   const cx=w/2,cy=h/2,n=Math.floor(320+e.mid*260),gold=137.5*Math.PI/180,sc=Math.min(w,h)*0.032;
@@ -288,16 +262,6 @@ const TEMPLATES=[
   for(let i=0;i<n;i++){const a=i*gold+ROT*0.3,r=sc*Math.sqrt(i)*(1+e.bass*0.1);
     const x=cx+Math.cos(a)*r,y=cy+Math.sin(a)*r,sz=1+i/n*3*(1+e.high);
     g.fillStyle=i>n-40?ic(0.8):lc(0.25+i/n*0.5);g.beginPath();g.arc(x,y,sz,0,Math.PI*2);g.fill();}
-  noglow();
-}},
-
-{cat:'Generative',name:'Log Spiral',draw:(g,w,h,f,wv,t,e)=>{ // spiral of polygons (screenshot #3)
-  const cx=w/2,cy=h/2;g.lineWidth=1.3;glow(10);
-  for(let i=0;i<44;i++){const a=i*0.5+ROT*0.4,r=Math.min(w,h)*0.02*Math.pow(1.14,i);
-    if(r>Math.max(w,h))break;const x=cx+Math.cos(a)*r,y=cy+Math.sin(a)*r,sz=r*0.16*(1+e.bass*0.3),sides=5;
-    g.strokeStyle=lc(0.2+e.mid*0.4);g.beginPath();
-    for(let k=0;k<=sides;k++){const aa=k/sides*Math.PI*2+a;const px=x+Math.cos(aa)*sz,py=y+Math.sin(aa)*sz;k?g.lineTo(px,py):g.moveTo(px,py);}
-    g.stroke();}
   noglow();
 }},
 
@@ -345,28 +309,10 @@ const TEMPLATES=[
   noglow();
 }},
 
-{cat:'Generative',name:'Fib Spiral Dots',draw:(g,w,h,f,wv,t,e)=>{ // dotted golden spiral with tick marks (screenshot #7 variant)
-  const cx=w/2,cy=h/2;g.lineWidth=1;glow(6);
-  const turns=Math.floor(140+e.mid*120);
-  for(let i=0;i<turns;i++){const a=i*0.35+ROT*0.3,r=Math.min(w,h)*0.012*i*(1+e.bass*0.1);
-    const x=cx+Math.cos(a)*r,y=cy+Math.sin(a)*r,sz=1.2+e.high*1.4;
-    g.fillStyle=i>turns-30?ic(0.6+e.beat*0.4):lc(0.3);g.beginPath();g.arc(x,y,sz,0,Math.PI*2);g.fill();
-    if(i%6===0){g.strokeStyle=lc(0.12);g.beginPath();g.moveTo(x,y);g.lineTo(x+Math.cos(a)*8,y+Math.sin(a)*8);g.stroke();}}
-  noglow();
-}},
-
 {cat:'Generative',name:'Lissajous',draw:(g,w,h,f,wv,t,e)=>{
   const cx=w/2,cy=h/2,A=Math.min(w,h)*0.36,a=3+Math.floor(e.mid*3),b=2+Math.floor(e.high*3),d=t*0.4;
   g.lineWidth=1.6;glow(14);g.strokeStyle=ic(0.6+e.beat*0.3);g.beginPath();
   for(let i=0;i<=400;i++){const p=i/400*Math.PI*2;const x=cx+Math.sin(a*p+d)*A*(1+e.bass*0.1),y=cy+Math.sin(b*p)*A;i?g.lineTo(x,y):g.moveTo(x,y);}
-  g.stroke();noglow();
-}},
-
-{cat:'Generative',name:'Rose Curve',draw:(g,w,h,f,wv,t,e)=>{
-  const cx=w/2,cy=h/2,A=Math.min(w,h)*0.38,k=3+Math.floor(e.mid*5);g.lineWidth=1.4;glow(12);
-  g.strokeStyle=lc(0.3+e.high*0.4);g.beginPath();
-  for(let i=0;i<=720;i++){const th=i*Math.PI/180+ROT*0.2;const r=A*Math.cos(k*th)*(1+e.bass*0.15);
-    const x=cx+Math.cos(th)*r,y=cy+Math.sin(th)*r;i?g.lineTo(x,y):g.moveTo(x,y);}
   g.stroke();noglow();
 }},
 
@@ -414,34 +360,6 @@ const TEMPLATES=[
   noglow();
 }},
 
-{cat:'Spectrum',name:'Mirror Wave',draw:(g,w,h,f,wv,t,e)=>{
-  g.lineWidth=1.4;glow(8);
-  for(const dir of [1,-1]){g.strokeStyle=lc(0.3);g.beginPath();
-    for(let i=0;i<wv.length;i+=2){const x=i/wv.length*w,amp=Math.abs((wv[i]-128)/128)*h*0.3;const y=h/2+dir*amp;i?g.lineTo(x,y):g.moveTo(x,y);}g.stroke();}
-  noglow();
-}},
-
-{cat:'Spectrum',name:'Grid Cells',draw:(g,w,h,f,wv,t,e)=>{
-  const cols=14,rows=Math.round(cols*h/w),cw=w/cols,ch=h/rows;g.lineWidth=1;
-  for(let y=0;y<rows;y++)for(let x=0;x<cols;x++){const v=f[Math.floor((x+y)/(cols+rows)*f.length*0.6)]/255;
-    if(v>0.12){g.strokeStyle=v>0.5?ic(v):lc(v*0.8);g.strokeRect(x*cw+cw*0.18,y*ch+ch*0.18,cw*0.64,ch*0.64);}}
-}},
-
-{cat:'Spectrum',name:'Orbit Dots',draw:(g,w,h,f,wv,t,e)=>{
-  const cx=w/2,cy=h/2;glow(6);
-  for(let ring=1;ring<=5;ring++){const dots=ring*7,rad=Math.min(w,h)*0.07*ring*(1+e.bass*0.25);
-    for(let i=0;i<dots;i++){const a=i/dots*Math.PI*2+ROT*0.15*(ring%2?1:-1);
-      g.fillStyle=lc(0.3+e.high*0.5);g.beginPath();g.arc(cx+Math.cos(a)*rad,cy+Math.sin(a)*rad,2+e.beat*2,0,Math.PI*2);g.fill();}}
-  noglow();
-}},
-
-{cat:'Spectrum',name:'Monolith',draw:(g,w,h,f,wv,t,e)=>{ // reworked as wireframe column
-  const bw=w*0.12,bh=h*(0.3+e.bass*0.45),x=w/2-bw/2,y=h/2-bh/2;g.lineWidth=1.6;glow(16);
-  g.strokeStyle=ic(0.6+e.beat*0.3);g.strokeRect(x,y,bw,bh);
-  g.strokeStyle=lc(0.15+e.mid*0.25);const segs=10;for(let i=1;i<segs;i++){g.beginPath();g.moveTo(x,y+bh/segs*i);g.lineTo(x+bw,y+bh/segs*i);g.stroke();}
-  noglow();
-}},
-
 {cat:'Spectrum',name:'Bloom',draw:(g,w,h,f,wv,t,e)=>{
   const cx=w/2,cy=h/2,r=Math.min(w,h)*(0.15+e.bass*0.5);
   const grad=g.createRadialGradient(cx,cy,0,cx,cy,r);
@@ -463,42 +381,6 @@ const TEMPLATES=[
   glow(20);g.strokeStyle=ic(0.4+e.beat*0.5);g.beginPath();g.arc(cx,cy,3+e.beat*6,0,Math.PI*2);g.stroke();noglow();
 }},
 
-{cat:'Wireframe / 3D',name:'Octahedron',draw:(g,w,h,f,wv,t,e)=>{
-  const cx=w/2,cy=h/2,foc=w*1.5,R=Math.min(w,h)*0.3*(1+e.bass*0.3);
-  const V=[[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]];
-  const E=[[0,2],[0,3],[0,4],[0,5],[1,2],[1,3],[1,4],[1,5],[2,4],[2,5],[3,4],[3,5]];
-  const pts=V.map(([x,y,z])=>{const[rx,ry,rz]=rot3(x*R,y*R,z*R,ROT*0.5,ROT*1.1);return proj(rx,ry,rz,cx,cy,foc);});
-  g.lineWidth=1.5;glow(12);g.strokeStyle=lc(0.35+e.high*0.4);g.beginPath();
-  E.forEach(([a,b])=>{g.moveTo(pts[a][0],pts[a][1]);g.lineTo(pts[b][0],pts[b][1]);});g.stroke();noglow();
-}},
-
-{cat:'Wireframe / 3D',name:'Tetraeder',draw:(g,w,h,f,wv,t,e)=>{
-  const cx=w/2,cy=h/2,foc=w*1.5,R=Math.min(w,h)*0.3*(1+e.bass*0.35);
-  const V=[[1,1,1],[1,-1,-1],[-1,1,-1],[-1,-1,1]];
-  const E=[[0,1],[0,2],[0,3],[1,2],[1,3],[2,3]];
-  const pts=V.map(([x,y,z])=>{const[rx,ry,rz]=rot3(x*R*0.6,y*R*0.6,z*R*0.6,ROT*0.8,ROT*0.6);return proj(rx,ry,rz,cx,cy,foc);});
-  g.lineWidth=1.6;glow(16);g.strokeStyle=ic(0.3+e.beat*0.5);g.beginPath();
-  E.forEach(([a,b])=>{g.moveTo(pts[a][0],pts[a][1]);g.lineTo(pts[b][0],pts[b][1]);});g.stroke();noglow();
-}},
-
-(()=>{
-  const ph=(1+Math.sqrt(5))/2,ip=1/ph,V=[];
-  [-1,1].forEach(a=>[-1,1].forEach(b=>[-1,1].forEach(c=>V.push([a,b,c]))));
-  [-1,1].forEach(a=>[-1,1].forEach(b=>{V.push([0,a*ip,b*ph]);V.push([a*ip,b*ph,0]);V.push([a*ph,0,b*ip]);}));
-  const E=[];
-  for(let i=0;i<V.length;i++)for(let j=i+1;j<V.length;j++){
-    const dx=V[i][0]-V[j][0],dy=V[i][1]-V[j][1],dz=V[i][2]-V[j][2],d=dx*dx+dy*dy+dz*dz;
-    if(d<1.55)E.push([i,j]);
-  }
-  return {cat:'Wireframe / 3D',name:'Dodekaeder',draw:(g,w,h,f,wv,t,e)=>{
-    const cx=w/2,cy=h/2,foc=w*1.6,R=Math.min(w,h)*0.22*(1+e.bass*0.3);
-    const pts=V.map(([x,y,z])=>{const[rx,ry,rz]=rot3(x*R*0.55,y*R*0.55,z*R*0.55,ROT*0.4,ROT*0.7);return proj(rx,ry,rz,cx,cy,foc);});
-    g.lineWidth=1;glow(10);g.strokeStyle=lc(0.22+e.mid*0.35);g.beginPath();
-    E.forEach(([a,b])=>{g.moveTo(pts[a][0],pts[a][1]);g.lineTo(pts[b][0],pts[b][1]);});g.stroke();
-    noglow();
-  }};
-})(),
-
 {cat:'Wireframe / 3D',name:'Merkaba',draw:(g,w,h,f,wv,t,e)=>{
   const cx=w/2,cy=h/2,foc=w*1.5,R=Math.min(w,h)*0.3*(1+e.bass*0.3);
   const V1=[[1,1,1],[1,-1,-1],[-1,1,-1],[-1,-1,1]],V2=[[-1,-1,-1],[-1,1,1],[1,-1,1],[1,1,-1]];
@@ -509,69 +391,7 @@ const TEMPLATES=[
   drawSolid(V1,lc(0.32+e.mid*0.4));drawSolid(V2,ic(0.3+e.beat*0.5));noglow();
 }},
 
-{cat:'Wireframe / 3D',name:'Möbius Band',draw:(g,w,h,f,wv,t,e)=>{
-  const cx=w/2,cy=h/2,foc=w*1.4,R=Math.min(w,h)*0.22*(1+e.bass*0.2),bw=Math.min(w,h)*0.1*(1+e.mid*0.3),NU=48,NV=6;
-  g.lineWidth=1.2;glow(10);
-  const pt=(iu,iv)=>{const u=iu/NU*Math.PI*2,v=(iv/NV-0.5)*2*bw;
-    const px=(R+v*Math.cos(u/2))*Math.cos(u),py=(R+v*Math.cos(u/2))*Math.sin(u),pz=v*Math.sin(u/2);
-    const[x,y,z]=rot3(px,py,pz,0.9,ROT);return proj(x,y,z,cx,cy,foc);};
-  for(let iv=0;iv<=NV;iv++){g.beginPath();for(let iu=0;iu<=NU;iu++){const[sx,sy]=pt(iu,iv);iu?g.lineTo(sx,sy):g.moveTo(sx,sy);}
-    g.strokeStyle=lc(0.16+e.high*0.35);g.stroke();}
-  glow(18);g.strokeStyle=ic(0.4+e.beat*0.4);g.beginPath();
-  for(let iu=0;iu<=NU;iu++){const[sx,sy]=pt(iu,NV/2);iu?g.lineTo(sx,sy):g.moveTo(sx,sy);}g.stroke();noglow();
-}},
-
-{cat:'Wireframe / 3D',name:'Kegel Array',draw:(g,w,h,f,wv,t,e)=>{
-  const cx=w/2,cy=h/2,foc=w*1.5;g.lineWidth=1.1;
-  const cone=(ox,oz,sz,ph)=>{
-    const N=14,segs=[];
-    for(let i=0;i<=N;i++){const a=i/N*Math.PI*2;segs.push(rot3(Math.cos(a)*sz,sz*0.9,Math.sin(a)*sz,ROT*0.5+ph,ROT+ph));}
-    const tip=rot3(0,-sz*1.4,0,ROT*0.5+ph,ROT+ph);
-    glow(8);g.strokeStyle=lc(0.24+e.mid*0.4);g.beginPath();
-    segs.forEach(([x,y,z],i)=>{const[sx,sy]=proj(x+ox,y,z+oz,cx,cy,foc);i?g.lineTo(sx,sy):g.moveTo(sx,sy);});g.closePath();g.stroke();
-    const[tsx,tsy]=proj(tip[0]+ox,tip[1],tip[2]+oz,cx,cy,foc);g.beginPath();
-    for(let i=0;i<N;i+=3){const[x,y,z]=segs[i];const[sx,sy]=proj(x+ox,y,z+oz,cx,cy,foc);g.moveTo(tsx,tsy);g.lineTo(sx,sy);}
-    g.stroke();
-  };
-  const sz=Math.min(w,h)*0.09*(1+e.bass*0.3);
-  for(let i=-1;i<=1;i++)cone(i*Math.min(w,h)*0.26,0,sz,i*0.8+e.beat*0.3);
-  noglow();
-}},
-
-{cat:'Wireframe / 3D',name:'Spiral Treppe',draw:(g,w,h,f,wv,t,e)=>{
-  const cx=w/2,cy=h/2,foc=w*1.5,R=Math.min(w,h)*0.22*(1+e.bass*0.2),len=Math.min(w,h)*0.9,N=26;
-  g.lineWidth=1.2;glow(8);g.strokeStyle=lc(0.28+e.mid*0.4);
-  for(let i=0;i<=N;i++){
-    const yv=(i/N-0.5)*len,ang=i*0.45+ROT;
-    const p1=rot3(0,yv,0,0.4,0.1),p2=rot3(Math.cos(ang)*R,yv,Math.sin(ang)*R,0.4,0.1);
-    const[sx1,sy1]=proj(p1[0],p1[1],p1[2],cx,cy,foc),[sx2,sy2]=proj(p2[0],p2[1],p2[2],cx,cy,foc);
-    g.beginPath();g.moveTo(sx1,sy1);g.lineTo(sx2,sy2);g.stroke();
-  }
-  glow(16);g.strokeStyle=ic(0.4+e.beat*0.5);g.beginPath();
-  for(let i=0;i<=N;i++){const yv=(i/N-0.5)*len,ang=i*0.45+ROT;
-    const[x,y,z]=rot3(Math.cos(ang)*R,yv,Math.sin(ang)*R,0.4,0.1);const[sx,sy]=proj(x,y,z,cx,cy,foc);
-    i?g.lineTo(sx,sy):g.moveTo(sx,sy);}
-  g.stroke();noglow();
-}},
-
-{cat:'Wireframe / 3D',name:'DNA Helix',draw:(g,w,h,f,wv,t,e)=>{
-  const cx=w/2,cy=h/2,foc=w*1.5,R=Math.min(w,h)*0.16*(1+e.bass*0.25),len=Math.min(w,h)*0.9,N=60;
-  g.lineWidth=1.3;glow(10);
-  const strand=(phase,col)=>{g.beginPath();
-    for(let i=0;i<=N;i++){const yv=(i/N-0.5)*len,ang=i*0.5+ROT+phase;
-      const[x,y,z]=rot3(Math.cos(ang)*R,yv,Math.sin(ang)*R,0.3,0.15);const[sx,sy]=proj(x,y,z,cx,cy,foc);
-      i?g.lineTo(sx,sy):g.moveTo(sx,sy);}
-    g.strokeStyle=col;g.stroke();};
-  strand(0,lc(0.4+e.mid*0.4));strand(Math.PI,ic(0.4+e.high*0.4));
-  g.strokeStyle=lc(0.15);g.lineWidth=1;
-  for(let i=0;i<=N;i+=3){const yv=(i/N-0.5)*len,ang=i*0.5+ROT;
-    const p1=rot3(Math.cos(ang)*R,yv,Math.sin(ang)*R,0.3,0.15),p2=rot3(Math.cos(ang+Math.PI)*R,yv,Math.sin(ang+Math.PI)*R,0.3,0.15);
-    const[sx1,sy1]=proj(p1[0],p1[1],p1[2],cx,cy,foc),[sx2,sy2]=proj(p2[0],p2[1],p2[2],cx,cy,foc);
-    g.beginPath();g.moveTo(sx1,sy1);g.lineTo(sx2,sy2);g.stroke();}
-  noglow();
-}},
-
-{cat:'Wireframe / 3D',name:'Spektrum Terrain',draw:(() => {
+{cat:'Frequenz-Map',name:'Spektrum Terrain',draw:(() => {
   const HISTORY=24;let buf=null;
   return (g,w,h,f,wv,t,e)=>{
     if(!buf){buf=[];for(let i=0;i<HISTORY;i++)buf.push(new Float32Array(32));}
@@ -593,6 +413,114 @@ const TEMPLATES=[
     noglow();
   };
 })()},
+
+(()=>{
+  let spec=null,sw=0,sh=0;
+  return {cat:'Frequenz-Map',name:'Spectrogram Wasserfall',draw:(g,w,h,f,wv,t,e)=>{
+    if(!spec||sw!==w||sh!==h){spec=document.createElement('canvas');spec.width=w;spec.height=h;sw=w;sh=h;
+      spec.getContext('2d').fillRect(0,0,w,h);}
+    const sc=spec.getContext('2d');
+    sc.drawImage(spec,-2,0);sc.fillStyle='#000';sc.fillRect(w-2,0,2,h);
+    for(let y=0;y<h;y+=2){
+      const bi=Math.floor((1-y/h)*f.length*0.5),v=(f[bi]/255)*(1+e.bass*0.1);
+      if(v>0.04){sc.fillStyle=v>0.6?ic(Math.min(1,v)):lc(v*0.9);sc.fillRect(w-2,y,2,2);}
+    }
+    g.drawImage(spec,0,0);
+    glow(14);g.strokeStyle=ic(0.35+e.beat*0.45);g.beginPath();g.moveTo(w-1,0);g.lineTo(w-1,h);g.stroke();noglow();
+  }};
+})(),
+
+(()=>{
+  const HISTORY=20,BINS=48;let buf=null;
+  return {cat:'Frequenz-Map',name:'Radiales Terrain',draw:(g,w,h,f,wv,t,e)=>{
+    if(!buf){buf=[];for(let i=0;i<HISTORY;i++)buf.push(new Float32Array(BINS));}
+    buf.pop();const row=new Float32Array(BINS);
+    for(let i=0;i<BINS;i++)row[i]=f[Math.floor(i/BINS*f.length*0.6)]/255;
+    buf.unshift(row);
+    const cx=w/2,cy=h/2,rMax=Math.min(w,h)*0.46;
+    for(let r=HISTORY-1;r>=0;r--){
+      const rad=rMax*((r+1)/HISTORY)*(1+e.bass*0.1);
+      g.beginPath();
+      for(let i=0;i<=BINS;i++){
+        const a=i/BINS*Math.PI*2+ROT*0.1,v=buf[r][i%BINS],rr=rad*(0.7+v*0.3);
+        const x=cx+Math.cos(a)*rr,y=cy+Math.sin(a)*rr;
+        i?g.lineTo(x,y):g.moveTo(x,y);
+      }
+      glow(r===0?14:0);
+      g.strokeStyle=r===0?ic(0.5+e.beat*0.4):lc(0.34*(1-r/HISTORY)+e.mid*0.2);
+      g.stroke();
+    }
+    noglow();
+  }};
+})(),
+
+(()=>{
+  const HISTORY=22,BINS=28;let buf=null;
+  return {cat:'Frequenz-Map',name:'Terrain Mesh (Tief)',draw:(g,w,h,f,wv,t,e)=>{
+    if(!buf){buf=[];for(let i=0;i<HISTORY;i++)buf.push(new Float32Array(BINS));}
+    buf.pop();const row=new Float32Array(BINS);
+    for(let i=0;i<BINS;i++)row[i]=f[Math.floor(i/BINS*f.length*0.7)]/255;
+    buf.unshift(row);
+    const cx=w/2,cy=h*0.58,foc=w*1.1,GS=w*0.75;
+    const pt=(r,i)=>{
+      const gx=(i/(BINS-1)-0.5)*GS,gz=(r/HISTORY-0.5)*GS*1.6,gy=-buf[r][i]*Math.min(w,h)*0.28*(1+e.bass*0.25);
+      const[x,y,z]=rot3(gx,gy,gz,0.75,ROT*0.06);return proj(x,y,z,cx,cy,foc);
+    };
+    for(let r=0;r<HISTORY;r++){
+      g.beginPath();
+      for(let i=0;i<BINS;i++){const[sx,sy]=pt(r,i);i?g.lineTo(sx,sy):g.moveTo(sx,sy);}
+      glow(r<2?12:0);g.strokeStyle=r<2?ic(0.5-r*0.15+e.beat*0.3):lc(0.16*(1-r/HISTORY)+e.mid*0.12);g.stroke();
+    }
+    g.strokeStyle=lc(0.08);
+    for(let i=0;i<BINS;i+=4){g.beginPath();
+      for(let r=0;r<HISTORY;r++){const[sx,sy]=pt(r,i);r?g.lineTo(sx,sy):g.moveTo(sx,sy);}
+      g.stroke();}
+    noglow();
+  }};
+})(),
+
+(()=>{
+  const BINS=40,TRAIL=14;let hist=null;
+  return {cat:'Frequenz-Map',name:'Frequenz Säulen Trail',draw:(g,w,h,f,wv,t,e)=>{
+    if(!hist){hist=[];for(let i=0;i<BINS;i++)hist.push(new Array(TRAIL).fill(0));}
+    const step=w/BINS;
+    for(let i=0;i<BINS;i++){const v=f[Math.floor(i/BINS*f.length*0.65)]/255;hist[i].pop();hist[i].unshift(v);}
+    for(let i=0;i<BINS;i++){
+      const x=i*step+step*0.2,bw=step*0.6;
+      for(let k=TRAIL-1;k>=0;k--){
+        const v=hist[i][k],bh=v*h*0.6,y=h-bh,age=k/TRAIL;
+        glow(k===0?12:0);
+        g.fillStyle=k===0?(v>0.5?ic(0.85+e.beat*0.15):lc(0.7)):lc((1-age)*0.35);
+        g.fillRect(x,y-k*3,bw,Math.max(1.5,bh-k*2));
+      }
+    }
+    noglow();
+  }};
+})(),
+
+(()=>{
+  const HISTORY=16;let buf=null;
+  return {cat:'Frequenz-Map',name:'Waveform Tunnel',draw:(g,w,h,f,wv,t,e)=>{
+    if(!buf){buf=[];for(let i=0;i<HISTORY;i++)buf.push(wv.slice());}
+    buf.pop();buf.unshift(wv.slice());
+    const cx=w/2,cy=h/2,foc=w*1.2,N=64;
+    for(let r=HISTORY-1;r>=0;r--){
+      const z=r*80+40;
+      g.beginPath();
+      for(let i=0;i<=N;i++){
+        const idx=Math.floor(i/N*buf[r].length),a=i/N*Math.PI*2;
+        const amp=(buf[r][idx]-128)/128,rad=Math.min(w,h)*0.25*(1+amp*0.5*(1+e.bass*0.3));
+        const[x,y,zz]=rot3(Math.cos(a)*rad,Math.sin(a)*rad,z,0,ROT*0.05);
+        const[sx,sy]=proj(x,y,zz,cx,cy,foc);
+        i?g.lineTo(sx,sy):g.moveTo(sx,sy);
+      }
+      glow(r===0?16:0);
+      g.strokeStyle=r===0?ic(0.6+e.beat*0.4):lc(0.3*(1-r/HISTORY)+e.high*0.15);
+      g.stroke();
+    }
+    noglow();
+  }};
+})(),
 
 /* ===== GENERATIVE — new ===== */
 {cat:'Generative',name:'Superformula',draw:(g,w,h,f,wv,t,e)=>{
