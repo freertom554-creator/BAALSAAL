@@ -116,6 +116,8 @@
     <div class="grp"><h3>Intensität</h3>
       <label class="field">Reaktivität</label>
       <input type="range" id="gainSlider" min="50" max="220" value="110">
+      <label class="field" style="margin-top:12px">Trail-Länge (Signature-Looks)</label>
+      <input type="range" id="trailSlider" min="2" max="14" value="6">
     </div>
     <div class="grp"><h3>Presets</h3>
       <div class="row"><input type="text" id="presetName" placeholder="Preset-Name" style="flex:1"></div>
@@ -158,7 +160,9 @@ const playBtn=$('playBtn'),recBtn=$('recBtn'),seek=$('seek'),tCur=$('tCur'),tDur
       statusEl=$('status'),dropHint=$('dropHint'),titleInput=$('titleInput'),
       showWordmark=$('showWordmark'),showGrain=$('showGrain'),gainSlider=$('gainSlider'),
       presetNameInput=$('presetName'),presetSaveBtn=$('presetSaveBtn'),presetListEl=$('presetList'),
-      durSeg=$('durSeg'),mp4Toggle=$('mp4Toggle');
+      durSeg=$('durSeg'),mp4Toggle=$('mp4Toggle'),trailSlider=$('trailSlider');
+let trailFade=6,lastBass=0;
+trailSlider.oninput=e=>trailFade=+e.target.value;
 
 /* ---------- DRAW HELPERS ---------- */
 function lc(a){return `rgba(${C.ink[0]},${C.ink[1]},${C.ink[2]},${a})`;}     // line colour (white)
@@ -187,6 +191,51 @@ function noise2(x,y){
   const a=h(xi,yi),b=h(xi+1,yi),c=h(xi,yi+1),d=h(xi+1,yi+1);
   return a+(b-a)*u+(c-a)*v+(a-b-c+d)*u*v;
 }
+
+/* ---------- SIMPLEX NOISE (2D, compact, for the Signature flow field) ---------- */
+const simplexPerm=(()=>{
+  const p=new Uint8Array(256);
+  for(let i=0;i<256;i++)p[i]=i;
+  for(let i=255;i>0;i--){const j=Math.floor(Math.random()*(i+1));const tmp=p[i];p[i]=p[j];p[j]=tmp;}
+  const perm=new Uint8Array(512);
+  for(let i=0;i<512;i++)perm[i]=p[i&255];
+  return perm;
+})();
+const SIMPLEX_GRAD=[[1,1],[-1,1],[1,-1],[-1,-1],[1,0],[-1,0],[0,1],[0,-1]];
+function simplex2(xin,yin){
+  const F2=0.5*(Math.sqrt(3)-1),G2=(3-Math.sqrt(3))/6;
+  const s=(xin+yin)*F2,i=Math.floor(xin+s),j=Math.floor(yin+s);
+  const t=(i+j)*G2,X0=i-t,Y0=j-t,x0=xin-X0,y0=yin-Y0;
+  let i1,j1;
+  if(x0>y0){i1=1;j1=0;}else{i1=0;j1=1;}
+  const x1=x0-i1+G2,y1=y0-j1+G2,x2=x0-1+2*G2,y2=y0-1+2*G2;
+  const ii=i&255,jj=j&255;
+  const gi0=simplexPerm[ii+simplexPerm[jj]]%8;
+  const gi1=simplexPerm[ii+i1+simplexPerm[jj+j1]]%8;
+  const gi2=simplexPerm[ii+1+simplexPerm[jj+1]]%8;
+  let n0=0,n1=0,n2=0;
+  let t0=0.5-x0*x0-y0*y0;
+  if(t0>0){t0*=t0;n0=t0*t0*(SIMPLEX_GRAD[gi0][0]*x0+SIMPLEX_GRAD[gi0][1]*y0);}
+  let t1=0.5-x1*x1-y1*y1;
+  if(t1>0){t1*=t1;n1=t1*t1*(SIMPLEX_GRAD[gi1][0]*x1+SIMPLEX_GRAD[gi1][1]*y1);}
+  let t2=0.5-x2*x2-y2*y2;
+  if(t2>0){t2*=t2;n2=t2*t2*(SIMPLEX_GRAD[gi2][0]*x2+SIMPLEX_GRAD[gi2][1]*y2);}
+  return 70*(n0+n1+n2);
+}
+// flow field angle driven by simplex noise; `warp` lets mids rotate/bend the field.
+// small jitter keeps particles from settling into perfectly closed loops (which would
+// otherwise repaint the same pixels every frame and burn a static glowing spot).
+function flowAngle(x,y,t,warp){
+  return simplex2(x*0.0018+t*0.06,y*0.0018-t*0.045)*Math.PI*2+warp+(Math.random()-0.5)*0.15;
+}
+
+/* ---------- SIGNATURE ENGINE (audio-driven flow-field particles, feedback trails) ----------
+   Principle: the audio CREATES the image. No energy -> nothing spawns, existing
+   trails fade to black (see render()). Never decorate a shape that exists without sound. */
+let SIGP=[];
+function sigSeedIfNeeded(target){ while(SIGP.length<target)SIGP.push(newSigParticle()); if(SIGP.length>target)SIGP.length=target; }
+function newSigParticle(){ return {x:Math.random()*W,y:Math.random()*H,px:0,py:0,life:0,max:60+Math.random()*120,ice:Math.random()<0.15}; }
+function resetSignature(){ SIGP=[]; ctx.fillStyle=C.bg; ctx.fillRect(0,0,W,H); }
 
 /* ---------- TEMPLATES ----------
    draw(g,w,h,f,wv,t,e)   e={bass,mid,high,beat}  rot = global rotation angle */
@@ -400,11 +449,13 @@ const TEMPLATES=[
     buf.unshift(row);
     const cx=w/2,cy=h*0.42,foc=w*1.5,GS=w*0.85;
     g.lineWidth=1;
+    // fixed perspective on purpose: this is a map (bass..high on one axis, time on
+    // the other) — it must stay still so it reads as data, not spin to fake motion.
     for(let r=0;r<HISTORY;r++){
       g.beginPath();
       for(let i=0;i<32;i++){
         const gx=(i/31-0.5)*GS,gz=(r/HISTORY-0.5)*GS*1.3,gy=-buf[r][i]*Math.min(w,h)*0.32*(1+e.bass*0.3);
-        const[x,y,z]=rot3(gx,gy,gz,0.55,ROT*0.08);const[sx,sy]=proj(x,y,z,cx,cy,foc);
+        const[x,y,z]=rot3(gx,gy,gz,0.55,0.15);const[sx,sy]=proj(x,y,z,cx,cy,foc);
         i?g.lineTo(sx,sy):g.moveTo(sx,sy);
       }
       glow(r<3?10:0);
@@ -462,9 +513,9 @@ const TEMPLATES=[
     for(let i=0;i<BINS;i++)row[i]=f[Math.floor(i/BINS*f.length*0.7)]/255;
     buf.unshift(row);
     const cx=w/2,cy=h*0.58,foc=w*1.1,GS=w*0.75;
-    const pt=(r,i)=>{
+    const pt=(r,i)=>{ // fixed perspective — same "readable map" rule as Spektrum Terrain
       const gx=(i/(BINS-1)-0.5)*GS,gz=(r/HISTORY-0.5)*GS*1.6,gy=-buf[r][i]*Math.min(w,h)*0.28*(1+e.bass*0.25);
-      const[x,y,z]=rot3(gx,gy,gz,0.75,ROT*0.06);return proj(x,y,z,cx,cy,foc);
+      const[x,y,z]=rot3(gx,gy,gz,0.75,0.1);return proj(x,y,z,cx,cy,foc);
     };
     for(let r=0;r<HISTORY;r++){
       g.beginPath();
@@ -712,6 +763,201 @@ const TEMPLATES=[
   noglow();
 }},
 
+/* ===== SIGNATURE — audio-driven flow-field engine. No sound, no shape. ===== */
+{cat:'Signature',name:'Flux',signature:true,draw:(g,w,h,f,wv,t,e)=>{
+  const target=Math.floor((e.bass+e.mid+e.high)*900);
+  sigSeedIfNeeded(target);
+  if(e.beat>0.5){
+    for(let i=0;i<Math.floor(e.beat*60);i++){
+      const a=Math.random()*6.28,r=Math.random()*30;
+      const p=newSigParticle();p.x=w/2+Math.cos(a)*r;p.y=h/2+Math.sin(a)*r;p.burst=a;p.ice=Math.random()<0.5;SIGP.push(p);
+    }
+  }
+  g.globalCompositeOperation='lighter';
+  for(const p of SIGP){
+    p.px=p.x;p.py=p.y;
+    let ang=flowAngle(p.x,p.y,t,e.mid*3.0);
+    if(p.burst!==undefined){ang=p.burst;if(p.life>10)delete p.burst;}
+    const spd=1.2+e.high*7+e.bass*4;
+    p.x+=Math.cos(ang)*spd;p.y+=Math.sin(ang)*spd;p.life++;
+    g.strokeStyle=p.ice?ic(0.08+e.bass*0.4):lc(0.05+e.high*0.5);
+    g.lineWidth=p.ice?1.4:0.9;
+    if(p.ice&&e.bass>0.4){g.shadowBlur=10;g.shadowColor='#6db8ff';}else g.shadowBlur=0;
+    g.beginPath();g.moveTo(p.px,p.py);g.lineTo(p.x,p.y);g.stroke();
+    if(p.life>p.max||p.x<-20||p.x>w+20||p.y<-20||p.y>h+20)Object.assign(p,newSigParticle());
+  }
+  g.shadowBlur=0;g.globalCompositeOperation='source-over';
+}},
+
+{cat:'Signature',name:'Ink Bloom',signature:true,draw:(g,w,h,f,wv,t,e)=>{
+  const target=Math.floor((e.mid+e.high)*500);
+  sigSeedIfNeeded(target);
+  if(e.bass>0.35&&e.bass>lastBass+0.06){
+    const cxp=w*(0.25+Math.random()*0.5),cyp=h*(0.25+Math.random()*0.5);
+    for(let i=0;i<Math.floor(e.bass*90);i++){
+      const a=Math.random()*6.28,r=Math.random()*20;
+      const p=newSigParticle();p.x=cxp+Math.cos(a)*r;p.y=cyp+Math.sin(a)*r;p.va=a;p.vs=1+Math.random()*3;p.bloom=true;p.ice=Math.random()<0.35;SIGP.push(p);
+    }
+  }
+  g.globalCompositeOperation='lighter';
+  for(const p of SIGP){
+    p.px=p.x;p.py=p.y;
+    if(p.bloom){p.x+=Math.cos(p.va)*p.vs*(1+e.mid*2);p.y+=Math.sin(p.va)*p.vs*(1+e.mid*2);p.vs*=0.97;}
+    else{const ang=flowAngle(p.x,p.y,t,0);const spd=0.8+e.high*5;p.x+=Math.cos(ang)*spd;p.y+=Math.sin(ang)*spd;}
+    p.life++;
+    g.fillStyle=p.ice?ic(0.06+e.bass*0.3):lc(0.04+e.high*0.3);
+    if(p.ice){g.shadowBlur=12;g.shadowColor='#6db8ff';}else g.shadowBlur=0;
+    const sz=p.bloom?(1.5+e.bass*2):1;
+    g.beginPath();g.arc(p.x,p.y,sz,0,6.28);g.fill();
+    if(p.life>p.max||p.x<-20||p.x>w+20||p.y<-20||p.y>h+20)Object.assign(p,newSigParticle());
+  }
+  g.shadowBlur=0;g.globalCompositeOperation='source-over';
+}},
+
+{cat:'Signature',name:'Slit Storm',signature:true,draw:(g,w,h,f,wv,t,e)=>{
+  g.globalCompositeOperation='lighter';
+  const rows=3;
+  for(let r=0;r<rows;r++){
+    const yb=h*0.5+Math.sin(t*0.4+r*2)*h*0.18,warp=e.mid*140;
+    g.beginPath();
+    for(let i=0;i<wv.length;i+=2){
+      const x=i/wv.length*w,amp=(wv[i]-128)/128,drift=Math.sin(x*0.01+t*1.5+r)*warp;
+      const y=yb+amp*h*0.22*(1+e.bass)+drift;
+      i?g.lineTo(x,y):g.moveTo(x,y);
+    }
+    const a=0.06+e.high*0.35;
+    g.strokeStyle=r===1?ic(0.1+e.bass*0.4):lc(a);
+    g.lineWidth=r===1?1.6:0.9;
+    if(r===1&&e.bass>0.4){g.shadowBlur=14;g.shadowColor='#6db8ff';}else g.shadowBlur=0;
+    g.stroke();
+  }
+  g.shadowBlur=0;g.globalCompositeOperation='source-over';
+}},
+
+{cat:'Signature',name:'Vortex Flux',signature:true,draw:(g,w,h,f,wv,t,e)=>{
+  const target=Math.floor((e.bass+e.mid+e.high)*850);
+  sigSeedIfNeeded(target);
+  const cx=w/2,cy=h/2;
+  if(e.beat>0.5){
+    for(let i=0;i<Math.floor(e.beat*50);i++){
+      const a=Math.random()*6.28,r=Math.min(w,h)*(0.3+Math.random()*0.2);
+      const p=newSigParticle();p.x=cx+Math.cos(a)*r;p.y=cy+Math.sin(a)*r;p.ice=Math.random()<0.5;SIGP.push(p);
+    }
+  }
+  g.globalCompositeOperation='lighter';
+  for(const p of SIGP){
+    p.px=p.x;p.py=p.y;
+    const dx=cx-p.x,dy=cy-p.y,dist=Math.hypot(dx,dy)+1;
+    const tangent=Math.atan2(dy,dx)+Math.PI/2,inward=Math.atan2(dy,dx);
+    const noiseAng=flowAngle(p.x,p.y,t,e.mid*2.5),pull=Math.min(0.4,60/dist);
+    const ang=tangent*(1-pull)+noiseAng*pull*0.6+inward*pull*0.4;
+    const spd=1+e.high*6+e.bass*3;
+    p.x+=Math.cos(ang)*spd;p.y+=Math.sin(ang)*spd;p.life++;
+    g.strokeStyle=p.ice?ic(0.08+e.bass*0.4):lc(0.05+e.high*0.45);
+    g.lineWidth=p.ice?1.4:0.9;
+    if(p.ice&&e.bass>0.4){g.shadowBlur=10;g.shadowColor='#6db8ff';}else g.shadowBlur=0;
+    g.beginPath();g.moveTo(p.px,p.py);g.lineTo(p.x,p.y);g.stroke();
+    if(p.life>p.max||dist<4)Object.assign(p,newSigParticle());
+  }
+  g.shadowBlur=0;g.globalCompositeOperation='source-over';
+}},
+
+{cat:'Signature',name:'Turbulence',signature:true,draw:(g,w,h,f,wv,t,e)=>{
+  const target=Math.floor((e.bass+e.mid+e.high)*900);
+  sigSeedIfNeeded(target);
+  if(e.beat>0.5){
+    for(let i=0;i<Math.floor(e.beat*60);i++){
+      const p=newSigParticle();p.x=Math.random()*w;p.y=Math.random()*h;p.grp=i%2;p.ice=Math.random()<0.4;SIGP.push(p);
+    }
+  }
+  g.globalCompositeOperation='lighter';
+  for(let idx=0;idx<SIGP.length;idx++){
+    const p=SIGP[idx];
+    if(p.grp===undefined)p.grp=idx%2;
+    p.px=p.x;p.py=p.y;
+    const dir=p.grp?1:-1,ang=flowAngle(p.x,p.y,t*dir,e.mid*3)*dir;
+    const spd=1+e.high*6+e.bass*3;
+    p.x+=Math.cos(ang)*spd;p.y+=Math.sin(ang)*spd;p.life++;
+    g.strokeStyle=p.ice?ic(0.08+e.bass*0.4):lc(0.05+e.high*0.45);
+    g.lineWidth=p.ice?1.3:0.85;
+    if(p.ice&&e.bass>0.4){g.shadowBlur=10;g.shadowColor='#6db8ff';}else g.shadowBlur=0;
+    g.beginPath();g.moveTo(p.px,p.py);g.lineTo(p.x,p.y);g.stroke();
+    if(p.life>p.max||p.x<-20||p.x>w+20||p.y<-20||p.y>h+20){const grp=p.grp;Object.assign(p,newSigParticle());p.grp=grp;}
+  }
+  g.shadowBlur=0;g.globalCompositeOperation='source-over';
+}},
+
+{cat:'Signature',name:'Strands',signature:true,draw:(g,w,h,f,wv,t,e)=>{
+  const target=Math.floor((e.bass+e.mid+e.high)*40);
+  sigSeedIfNeeded(target);
+  if(e.beat>0.5&&SIGP.length<target+8){
+    for(let i=0;i<Math.floor(e.beat*4);i++){
+      const p=newSigParticle();p.x=Math.random()*w;p.y=Math.random()*h;p.ice=Math.random()<0.3;p.max=200+Math.random()*300;SIGP.push(p);
+    }
+  }
+  g.globalCompositeOperation='lighter';
+  for(const p of SIGP){
+    p.px=p.x;p.py=p.y;
+    const ang=flowAngle(p.x,p.y,t*0.6,e.mid*2),spd=0.8+e.high*4+e.bass*2;
+    p.x+=Math.cos(ang)*spd;p.y+=Math.sin(ang)*spd;p.life++;
+    g.strokeStyle=p.ice?ic(0.1+e.bass*0.5):lc(0.1+e.high*0.55);
+    g.lineWidth=p.ice?2.6:1.8;
+    if(p.ice&&e.bass>0.3){g.shadowBlur=14;g.shadowColor='#6db8ff';}else g.shadowBlur=0;
+    g.beginPath();g.moveTo(p.px,p.py);g.lineTo(p.x,p.y);g.stroke();
+    if(p.life>p.max||p.x<-20||p.x>w+20||p.y<-20||p.y>h+20){Object.assign(p,newSigParticle());p.max=200+Math.random()*300;}
+  }
+  g.shadowBlur=0;g.globalCompositeOperation='source-over';
+}},
+
+{cat:'Signature',name:'Nebula',signature:true,draw:(g,w,h,f,wv,t,e)=>{
+  const target=Math.floor((e.mid+e.high)*400);
+  sigSeedIfNeeded(target);
+  if(e.bass>0.3&&e.bass>lastBass+0.05){
+    const cxp=w*(0.2+Math.random()*0.6),cyp=h*(0.2+Math.random()*0.6);
+    for(let i=0;i<Math.floor(e.bass*70);i++){
+      const a=Math.random()*6.28,r=Math.random()*40;
+      const p=newSigParticle();p.x=cxp+Math.cos(a)*r;p.y=cyp+Math.sin(a)*r;p.va=a;p.vs=0.3+Math.random()*1;p.bloom=true;p.max=200+Math.random()*260;p.ice=Math.random()<0.3;SIGP.push(p);
+    }
+  }
+  g.globalCompositeOperation='lighter';
+  for(const p of SIGP){
+    p.px=p.x;p.py=p.y;
+    if(p.bloom){p.x+=Math.cos(p.va)*p.vs*(1+e.mid*1.2);p.y+=Math.sin(p.va)*p.vs*(1+e.mid*1.2);p.vs*=0.985;}
+    else{const ang=flowAngle(p.x,p.y,t*0.5,0),spd=0.4+e.high*2.5;p.x+=Math.cos(ang)*spd;p.y+=Math.sin(ang)*spd;}
+    p.life++;
+    g.fillStyle=p.ice?ic(0.035+e.bass*0.18):lc(0.025+e.high*0.16);
+    if(p.ice){g.shadowBlur=16;g.shadowColor='#6db8ff';}else g.shadowBlur=0;
+    const sz=p.bloom?(3+e.bass*4):2;
+    g.beginPath();g.arc(p.x,p.y,sz,0,6.28);g.fill();
+    if(p.life>p.max||p.x<-30||p.x>w+30||p.y<-30||p.y>h+30)Object.assign(p,newSigParticle());
+  }
+  g.shadowBlur=0;g.globalCompositeOperation='source-over';
+}},
+
+{cat:'Signature',name:'Shear',signature:true,draw:(g,w,h,f,wv,t,e)=>{
+  const target=Math.floor((e.bass+e.mid+e.high)*700);
+  sigSeedIfNeeded(target);
+  if(e.beat>0.5){
+    for(let i=0;i<Math.floor(e.beat*50);i++){
+      const p=newSigParticle();p.x=Math.random()*w;p.y=Math.random()*h;p.ice=Math.random()<0.4;SIGP.push(p);
+    }
+  }
+  g.globalCompositeOperation='lighter';
+  for(const p of SIGP){
+    p.px=p.x;p.py=p.y;
+    const band=Math.floor(p.y/h*6),dir=band%2?1:-1;
+    const n=simplex2(p.x*0.002,p.y*0.006+t*0.1)*e.mid*2;
+    const spd=(1.5+e.high*7+e.bass*4)*dir;
+    p.x+=spd+n*2;p.y+=Math.sin(p.x*0.01+t+band)*0.6;p.life++;
+    g.strokeStyle=p.ice?ic(0.08+e.bass*0.4):lc(0.05+e.high*0.45);
+    g.lineWidth=p.ice?1.4:0.9;
+    if(p.ice&&e.bass>0.4){g.shadowBlur=10;g.shadowColor='#6db8ff';}else g.shadowBlur=0;
+    g.beginPath();g.moveTo(p.px,p.py);g.lineTo(p.x,p.y);g.stroke();
+    if(p.life>p.max||p.x<-20||p.x>w+20)Object.assign(p,newSigParticle());
+  }
+  g.shadowBlur=0;g.globalCompositeOperation='source-over';
+}},
+
 ];
 
 let currentTpl=0;
@@ -723,7 +969,7 @@ TEMPLATES.forEach((tpl,i)=>{
   if(tpl.cat!==lastCat){lastCat=tpl.cat;const c=document.createElement('div');c.className='cat';c.textContent=tpl.cat;tplList.appendChild(c);}
   const el=document.createElement('div');el.className='tpl'+(i===0?' active':'');el.dataset.i=i;
   el.innerHTML=`<span class="num">${String(i+1).padStart(2,'0')}</span>${tpl.name}`;
-  el.onclick=()=>{currentTpl=i;document.querySelectorAll('.tpl').forEach(t=>t.classList.remove('active'));el.classList.add('active');};
+  el.onclick=()=>{currentTpl=i;if(tpl.signature)resetSignature();document.querySelectorAll('.tpl').forEach(t=>t.classList.remove('active'));el.classList.add('active');};
   tplList.appendChild(el);
 });
 
@@ -758,16 +1004,28 @@ function togglePlay(){
 function render(){
   requestAnimationFrame(render);
   const t=performance.now()/1000;
-  ctx.fillStyle=C.bg;ctx.fillRect(0,0,W,H);
+  const isSig=!!TEMPLATES[currentTpl].signature;
+  // Signature looks: never full-clear — fade the previous frame instead, so trails
+  // melt into flow. Without sound (or paused) nothing new is drawn and the fade
+  // alone erases the screen: the audio creates the image, not the other way round.
+  if(isSig){ ctx.globalCompositeOperation='source-over'; ctx.fillStyle=`rgba(4,5,7,${1/trailFade})`; ctx.fillRect(0,0,W,H); }
+  else{ ctx.fillStyle=C.bg;ctx.fillRect(0,0,W,H); }
   if(analyser){
     analyser.getByteFrequencyData(freqData);analyser.getByteTimeDomainData(waveData);
     const bass=avg(freqData,0,0.08)/255*userGain,mid=avg(freqData,0.08,0.4)/255*userGain,high=avg(freqData,0.4,1)/255*userGain;
     smoothBass+=(bass-smoothBass)*0.25;smoothMid+=(mid-smoothMid)*0.3;smoothHigh+=(high-smoothHigh)*0.35;
     beat*=0.9;if(smoothBass>0.45&&smoothBass>beat+0.15)beat=smoothBass;
-    if(autoRotate)ROT+= 0.006 + smoothMid*0.02 + beat*0.012;
+    // baseline kept low on purpose: rotation should read as a response to the
+    // track (mid/beat), not a constant spin that fakes movement on its own.
+    if(autoRotate&&!isSig)ROT+= 0.002 + smoothMid*0.024 + beat*0.014;
     const e={bass:smoothBass,mid:smoothMid,high:smoothHigh,beat:Math.min(beat,1)};
     ctx.lineJoin='round';ctx.lineCap='round';
-    TEMPLATES[currentTpl].draw(ctx,W,H,freqData,waveData,t,e);
+    if(isSig){
+      if(playing){ TEMPLATES[currentTpl].draw(ctx,W,H,freqData,waveData,t,e); lastBass=smoothBass; }
+    }else{
+      TEMPLATES[currentTpl].draw(ctx,W,H,freqData,waveData,t,e);
+    }
+    ctx.globalCompositeOperation='source-over';
     noglow();
   }
   if(showGrain.checked)drawGrainVignette();
@@ -841,7 +1099,7 @@ function toggleRecord(){
       }
     }
   };
-  if(playing)togglePlay();pauseOffset=0;togglePlay();recorder.start();
+  if(playing)togglePlay();pauseOffset=0;SIGP=[];togglePlay();recorder.start();
   recording=true;recBtn.classList.add('active');recBtn.textContent='■ Aufnahme stoppen';statusEl.classList.add('rec');
   if(recordDuration>0){
     let remaining=recordDuration;statusEl.textContent=`● Aufnahme läuft — stoppt automatisch in ${remaining}s`;
@@ -883,7 +1141,7 @@ async function convertToMp4(webmBlob){
 /* ---------- helpers ---------- */
 function avg(arr,from,to){const a=Math.floor(arr.length*from),b=Math.floor(arr.length*to);let s=0;for(let i=a;i<b;i++)s+=arr[i];return s/(b-a||1);}
 function fmtTime(s){s=Math.max(0,s|0);return (s/60|0)+':'+String(s%60).padStart(2,'0');}
-function setFormat(fmt){const f=FORMATS[fmt];canvas.width=f.w;canvas.height=f.h;W=f.w;H=f.h;
+function setFormat(fmt){const f=FORMATS[fmt];canvas.width=f.w;canvas.height=f.h;W=f.w;H=f.h;SIGP=[];
   const wrap=$('stageWrap'),availH=wrap.clientHeight-48,availW=wrap.clientWidth-48,scale=Math.min(availW/W,availH/H);
   canvas.style.width=(W*scale)+'px';canvas.style.height=(H*scale)+'px';}
 
@@ -909,10 +1167,12 @@ function renderPresetList(){
 
 function applyPreset(p){
   currentTpl=p.tplIndex;
+  if(TEMPLATES[currentTpl].signature)resetSignature();
   document.querySelectorAll('.tpl').forEach(el=>el.classList.toggle('active',+el.dataset.i===p.tplIndex));
   document.querySelectorAll('#fmtSeg button').forEach(b=>b.classList.toggle('active',b.dataset.fmt===p.format));
   setFormat(p.format);
   gainSlider.value=p.gain;userGain=p.gain/100;
+  if(p.trail){trailSlider.value=p.trail;trailFade=+p.trail;}
   titleInput.value=p.title;
   $('glowOn').checked=p.glow;glowEnabled=p.glow;
   statusEl.textContent='Preset geladen · '+p.name;
@@ -922,7 +1182,7 @@ presetSaveBtn.onclick=()=>{
   const name=presetNameInput.value.trim();if(!name)return;
   const activeFmt=document.querySelector('#fmtSeg button.active').dataset.fmt;
   const list=loadPresets();
-  const preset={name,tplIndex:currentTpl,format:activeFmt,gain:gainSlider.value,title:titleInput.value,glow:glowEnabled};
+  const preset={name,tplIndex:currentTpl,format:activeFmt,gain:gainSlider.value,trail:trailSlider.value,title:titleInput.value,glow:glowEnabled};
   const existing=list.findIndex(p=>p.name===name);
   if(existing>=0)list[existing]=preset;else list.push(preset);
   savePresets(list);presetNameInput.value='';renderPresetList();
